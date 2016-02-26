@@ -118,6 +118,15 @@ else()
 	message("TBB not found")
 endif()
 
+# git
+find_program(GIT NAMES git)
+if(GIT)
+	set(GIT_FOUND ON CACHE STRING "git found" FORCE)
+	message("Found git: ${GIT}")
+else()
+	message(FATAL_ERROR "Could not find git. Please install git.\n")
+endif()
+
 # NODE
 find_program(NODE NAMES node)
 if(NODE)
@@ -156,6 +165,14 @@ endif()
 #########################
 # INTERNAL DEPENDENCIES #
 #########################
+
+find_path(RAPIDJSON_DIR PATH_SUFFIXES ${CMAKE_SOURCE_DIR}/3rdparty/github-InspectorWidget-rapidjson/include)
+find_path(PARTIALCSVPARSER_DIR PATH_SUFFIXES ${CMAKE_SOURCE_DIR}/3rdparty/github-InspectorWidget-PartialCsvParser/include)
+find_path(LIBUIOHOOK_DIR PATH_SUFFIXES ${CMAKE_SOURCE_DIR}/3rdparty/github-InspectorWidget-libuiohook/include)
+find_path(PEGTL_DIR PATH_SUFFIXES ${CMAKE_SOURCE_DIR}/3rdparty/github-InspectorWidget-PEGTL)
+if(NOT RAPIDJSON_DIR OR NOT PARTIALCSVPARSER_DIR OR NOT LIBUIOHOOK_DIR OR NOT PEGTL_DIR)
+	execute_process(COMMAND ${GIT} submodule update --init ${CMAKE_CURRENT_SOURCE_DIR} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} OUTPUT_VARIABLE GIT_OUT RESULT_VARIABLE GIT_RES)
+endif()
 
 set(RAPIDJSON_BUILD_DOC OFF CACHE STRING "" FORCE)
 set(RAPIDJSON_BUILD_EXAMPLES OFF CACHE STRING "" FORCE)
