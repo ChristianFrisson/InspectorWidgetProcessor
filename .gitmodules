@@ -4,3 +4,6 @@
 [submodule "3rdparty/github-InspectorWidget-PartialCsvParser"]
 	path = 3rdparty/github-InspectorWidget-PartialCsvParser
 	url = https://github.com/InspectorWidget/PartialCsvParser.git
+[submodule "3rdparty/github-InspectorWidget-PEGTL"]
+	path = 3rdparty/github-InspectorWidget-PEGTL
+	url = https://github.com/InspectorWidget/PEGTL.git
