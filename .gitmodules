@@ -7,3 +7,6 @@
 [submodule "3rdparty/github-InspectorWidget-PEGTL"]
 	path = 3rdparty/github-InspectorWidget-PEGTL
 	url = https://github.com/InspectorWidget/PEGTL.git
+[submodule "3rdparty/github-InspectorWidget-rapidjson"]
+	path = 3rdparty/github-InspectorWidget-rapidjson
+	url = https://github.com/InspectorWidget/rapidjson.git
