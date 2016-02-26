@@ -26,3 +26,11 @@
 *.exe
 *.out
 *.app
+
+# Node.js modules
+node_modules
+
+# QtCreator/CMake project files
+CMakeLists.txt.user
+build*
+
