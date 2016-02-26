@@ -8,6 +8,7 @@
         "nan": "^2.0.5"
     },
     "scripts": {
+        "preinstall" : "git submodule update --init",
         "install": "cmake-js rebuild"
     }
 }
