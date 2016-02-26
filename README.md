@@ -23,6 +23,7 @@ InspectorWidget is targeted at end users, usability experts, user experience and
 The Processor tool is a cross-platform server for automating annotations. 
 
 It is based on:
+- [cmake-js](https://github.com/cmake-js/cmake-js) / [cmake-js](https://github.com/cmake-js/cmake-js): a Node.js/io.js native addon build tool
 - [ColinH](https://github.com/ColinH) / [PEGTL](https://github.com/ColinH/PEGTL): a grammar/syntax lexer/parser
 - [kwhat](https://github.com/kwhat) / [libuiohook](https://github.com/kwhat/libuiohook): a library for hooking input events
 - [itseez](https://github.com/itseez) / [opencv](https://github.com/itseez/opencv): a library for computer vision

@@ -34,3 +34,5 @@ node_modules
 CMakeLists.txt.user
 build*
 
+# OSX
+.DS_Store
