@@ -1,3 +1,6 @@
 [submodule "3rdparty/github-InspectorWidget-libuiohook"]
 	path = 3rdparty/github-InspectorWidget-libuiohook
 	url = https://github.com/InspectorWidget/libuiohook.git
+[submodule "3rdparty/github-InspectorWidget-PartialCsvParser"]
+	path = 3rdparty/github-InspectorWidget-PartialCsvParser
+	url = https://github.com/InspectorWidget/PartialCsvParser.git
