@@ -1,0 +1,3 @@
+[submodule "3rdparty/github-InspectorWidget-libuiohook"]
+	path = 3rdparty/github-InspectorWidget-libuiohook
+	url = https://github.com/InspectorWidget/libuiohook.git
