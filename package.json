@@ -9,6 +9,6 @@
     },
     "scripts": {
         "preinstall": "./git-clone-submodules.sh",
-        "install": "cmake-js rebuild"
+         "install": "node rebuild.js"
     }
 }
