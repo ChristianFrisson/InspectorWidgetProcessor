@@ -12,10 +12,6 @@
 #include <algorithm>
 #include <fstream>
 
-#include "opencv2/imgcodecs.hpp"
-#include "opencv2/highgui/highgui.hpp"
-#include "opencv2/imgproc/imgproc.hpp"
-
 #include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/prettywriter.h" // for stringify JSON
@@ -26,6 +22,8 @@
 #include <string>
 #include <math.h>
 //#include <algorithm>
+
+#include <pugixml.hpp>
 
 #include <deque>
 #include <map>
@@ -103,7 +101,9 @@ class InspectorWidgetProcessor{
     float getStatusProgress();
     bool setStatusAndReturn(std::string phase, std::string error_message = "", std::string success_message = "" );
 
-    std::string getAnnotation(std::string name);
+    std::string getTemplateAnnotation(std::string name);
+
+    std::string getAccessibilityAnnotation(std::string name);
     
     std::vector<std::string> getTemplateList(){return template_list;}
 

@@ -18,80 +18,80 @@ bool canformword(int keycodeint){
 
     bool _canformword = false;
     switch(keycodeint){
-            // Begin Alphanumeric Zone
-        case VC_1: //0x0002
-        case VC_2: //0x0003
-        case VC_3: //0x0004
-        case VC_4: //0x0005
-        case VC_5: //0x0006
-        case VC_6: //0x0007
-        case VC_7: //0x0008
-        case VC_8: //0x0009
-        case VC_9: //0x000A
-        case VC_0: //0x000B
+    // Begin Alphanumeric Zone
+    case VC_1: //0x0002
+    case VC_2: //0x0003
+    case VC_3: //0x0004
+    case VC_4: //0x0005
+    case VC_5: //0x0006
+    case VC_6: //0x0007
+    case VC_7: //0x0008
+    case VC_8: //0x0009
+    case VC_9: //0x000A
+    case VC_0: //0x000B
 
-        case VC_MINUS: //0x000C	// '-'
-        case VC_EQUALS: //0x000D	// '='
-        case VC_BACKSPACE: //0x000E
+    case VC_MINUS: //0x000C	// '-'
+    case VC_EQUALS: //0x000D	// '='
+    case VC_BACKSPACE: //0x000E
 
-        case VC_A: //0x001E
-        case VC_B: //0x0030
-        case VC_C: //0x002E
-        case VC_D: //0x0020
-        case VC_E: //0x0012
-        case VC_F: //0x0021
-        case VC_G: //0x0022
-        case VC_H: //0x0023
-        case VC_I: //0x0017
-        case VC_J: //0x0024
-        case VC_K: //0x0025
-        case VC_L: //0x0026
-        case VC_M: //0x0032
-        case VC_N: //0x0031
-        case VC_O: //0x0018
-        case VC_P: //0x0019
-        case VC_Q: //0x0010
-        case VC_R: //0x0013
-        case VC_S: //0x001F
-        case VC_T: //0x0014
-        case VC_U: //0x0016
-        case VC_V: //0x002F
-        case VC_W: //0x0011
-        case VC_X: //0x002D
-        case VC_Y: //0x0015
-        case VC_Z: //0x002C
+    case VC_A: //0x001E
+    case VC_B: //0x0030
+    case VC_C: //0x002E
+    case VC_D: //0x0020
+    case VC_E: //0x0012
+    case VC_F: //0x0021
+    case VC_G: //0x0022
+    case VC_H: //0x0023
+    case VC_I: //0x0017
+    case VC_J: //0x0024
+    case VC_K: //0x0025
+    case VC_L: //0x0026
+    case VC_M: //0x0032
+    case VC_N: //0x0031
+    case VC_O: //0x0018
+    case VC_P: //0x0019
+    case VC_Q: //0x0010
+    case VC_R: //0x0013
+    case VC_S: //0x001F
+    case VC_T: //0x0014
+    case VC_U: //0x0016
+    case VC_V: //0x002F
+    case VC_W: //0x0011
+    case VC_X: //0x002D
+    case VC_Y: //0x0015
+    case VC_Z: //0x002C
 
-        case VC_OPEN_BRACKET: //0x001A	// '['
-        case VC_CLOSE_BRACKET: //0x001B	// ']'
-            //case VC_BACK_SLASH: //0x002B	// '\'
+    case VC_OPEN_BRACKET: //0x001A	// '['
+    case VC_CLOSE_BRACKET: //0x001B	// ']'
+        //case VC_BACK_SLASH: //0x002B	// '\'
 
-        case VC_SEMICOLON: //0x0027	// ';'
-        case VC_QUOTE: //0x0028
+    case VC_SEMICOLON: //0x0027	// ';'
+    case VC_QUOTE: //0x0028
 
-        case VC_COMMA: //0x0033	// ','
-        case VC_PERIOD: //0x0034	// '.'
-        case VC_SLASH: //0x0035	// '/'
+    case VC_COMMA: //0x0033	// ','
+    case VC_PERIOD: //0x0034	// '.'
+    case VC_SLASH: //0x0035	// '/'
 
-        case VC_SPACE: //0x0039
-            // End Alphanumeric Zone
+    case VC_SPACE: //0x0039
+        // End Alphanumeric Zone
 
-            _canformword = true;
-            break;
+        _canformword = true;
+        break;
 
-        case VC_SHIFT_L: //0x002A
-        case VC_SHIFT_R: //0x0036
-        case VC_CONTROL_L: //0x001D
-        case VC_CONTROL_R: //0x0E1D
-        case VC_ALT_L: //0x0038	// Option or Alt Key
-        case VC_ALT_R: //0x0E38	// Option or Alt Key
-        case VC_META_L: //0x0E5B	// Windows or Command Key
-        case VC_META_R: //0x0E5C	// Windows or Command Key
-            _canformword = false;
-            break;
+    case VC_SHIFT_L: //0x002A
+    case VC_SHIFT_R: //0x0036
+    case VC_CONTROL_L: //0x001D
+    case VC_CONTROL_R: //0x0E1D
+    case VC_ALT_L: //0x0038	// Option or Alt Key
+    case VC_ALT_R: //0x0E38	// Option or Alt Key
+    case VC_META_L: //0x0E5B	// Windows or Command Key
+    case VC_META_R: //0x0E5C	// Windows or Command Key
+        _canformword = false;
+        break;
 
-        default:
-            _canformword = false;
-            break;
+    default:
+        _canformword = false;
+        break;
 
     }
     return _canformword;
@@ -332,11 +332,11 @@ void overlayfooter(PrettyWriter<StringBuffer>& writer, std::string id, float out
 }
 
 std::string getStemName(std::string file_path){
-    #ifdef WIN32
+#ifdef WIN32
     std::string slash("\\");
-    #else
+#else
     std::string slash("/");
-    #endif
+#endif
     int lastslash = file_path.find_last_of(slash);
     std::string stemext = file_path.substr(lastslash+1, file_path.size());
     int lastpoint = stemext.find_last_of(".");
@@ -570,9 +570,9 @@ std::map< std::string, std::map<std::string, std::vector<float> > > InspectorWid
 }
 
 void MatchingMethod( cv::Mat& srca,  // The reference image
-                    cv::Mat& srcb,  // The template image
-                    cv::Mat& dst,   // Template matching result
-                    int match_method)
+                     cv::Mat& srcb,  // The template image
+                     cv::Mat& dst,   // Template matching result
+                     int match_method)
 {
     /// Create the result matrix
     cv::Mat result;
@@ -640,11 +640,11 @@ void fastMatchTemplate(cv::Mat& srca,  // The reference image
                 cv::Rect rr = r + (tpl.size() - cv::Size(1,1));
                 if(rr.x+rr.width<=ref.cols && rr.y+rr.height<=ref.rows){
                     cv::matchTemplate(
-                        ref(r + (tpl.size() - cv::Size(1,1))),
-                        tpl,
-                        res(r),
-                        match_method  /*TM_CCORR_NORMED*/
-                    );
+                                ref(r + (tpl.size() - cv::Size(1,1))),
+                                tpl,
+                                res(r),
+                                match_method  /*TM_CCORR_NORMED*/
+                                );
                 }
             }
         }
@@ -857,16 +857,16 @@ void InspectorWidgetProcessor::matchTemplates(){
 
             if(with_gui && matchVal>_threshold){
                 cv::rectangle(
-                    img, matchLoc,
-                    cv::Point(matchLoc.x + templates[_name].cols, matchLoc.y + templates[_name].rows),
-                    cv::Scalar(0,255,0), 2
-                );
+                            img, matchLoc,
+                            cv::Point(matchLoc.x + templates[_name].cols, matchLoc.y + templates[_name].rows),
+                            cv::Scalar(0,255,0), 2
+                            );
                 cv::floodFill(
-                    img, matchLoc,
-                    cv::Scalar(0), 0,
-                    cv::Scalar(.1),
-                    cv::Scalar(1.)
-                );
+                            img, matchLoc,
+                            cv::Scalar(0), 0,
+                            cv::Scalar(.1),
+                            cv::Scalar(1.)
+                            );
             }
         }
         else{
@@ -1065,15 +1065,15 @@ bool InspectorWidgetProcessor::detectText(){
                 //                    );
 
                 cv::rectangle(
-                    imz, rect,
-                    cv::Scalar(0,255,0), 2
-                );
+                            imz, rect,
+                            cv::Scalar(0,255,0), 2
+                            );
                 cv::floodFill(
-                    imz, cv::Point(rect.x , rect.y),
-                    cv::Scalar(0), 0,
-                    cv::Scalar(.1),
-                    cv::Scalar(1.)
-                );
+                            imz, cv::Point(rect.x , rect.y),
+                            cv::Scalar(0), 0,
+                            cv::Scalar(.1),
+                            cv::Scalar(1.)
+                            );
 
 
                 imshow("orig", imz );
@@ -1250,10 +1250,10 @@ bool InspectorWidgetProcessor::setStatusAndReturn(std::string phase, std::string
 bool InspectorWidgetProcessor::init( int argc, char** argv ){
     if(argc<3){
         return setStatusAndReturn(
-            /*phase*/ "init",
-            /*error*/ std::string("Usage: ")+std::string(argv[0])+std::string(" <data_path> <source_video> <template_img_1> [<template_img_2> ...] [<csv>] [template_constraint]"),
-            /*success*/ ""
-        );
+                    /*phase*/ "init",
+                    /*error*/ std::string("Usage: ")+std::string(argv[0])+std::string(" <data_path> <source_video> <template_img_1> [<template_img_2> ...] [<csv>] [template_constraint]"),
+                /*success*/ ""
+                );
     }
 
     std::vector<std::string> args;
@@ -1267,7 +1267,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
     this->clear();
     status_phase = "init";
     status_progress = 0;
-    active = true; 
+    active = true;
 
     pegtl::analyze< InspectorWidgetProcessorCommandParser::grammar >();
 
@@ -1275,11 +1275,11 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
 
 
     /*std::string*/ datapath = argv[0];
-    #ifdef WIN32
+#ifdef WIN32
     std::string slash("\\");
-    #else
+#else
     std::string slash("/");
-    #endif
+#endif
     std::size_t slashpos = datapath.find_last_of(slash);
     if(slashpos!=datapath.size()-1)
         datapath += slash;
@@ -1346,19 +1346,19 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
     vector<string> _splitstamps = splitconstraint (_timestamps, '-');
     if(_splitstamps.size()>=6 & _splitstamps[_splitstamps.size()-6].size() == 4 ){
         start_d.y = atoi(_splitstamps[_splitstamps.size()-6].substr(0,1).c_str())*1000
-            + atoi(_splitstamps[_splitstamps.size()-6].substr(1,1).c_str())*100
-            + atoi(_splitstamps[_splitstamps.size()-6].substr(2,1).c_str())*10
-            + atoi(_splitstamps[_splitstamps.size()-6].substr(3,1).c_str());
+                + atoi(_splitstamps[_splitstamps.size()-6].substr(1,1).c_str())*100
+                + atoi(_splitstamps[_splitstamps.size()-6].substr(2,1).c_str())*10
+                + atoi(_splitstamps[_splitstamps.size()-6].substr(3,1).c_str());
         start_d.m = atoi(_splitstamps[_splitstamps.size()-5].substr(0,1).c_str())*10
-            + atoi(_splitstamps[_splitstamps.size()-5].substr(1,1).c_str());
+                + atoi(_splitstamps[_splitstamps.size()-5].substr(1,1).c_str());
         start_d.d = atoi(_splitstamps[_splitstamps.size()-4].substr(0,1).c_str())*10
-            + atoi(_splitstamps[_splitstamps.size()-4].substr(1,1).c_str());
+                + atoi(_splitstamps[_splitstamps.size()-4].substr(1,1).c_str());
         start_t.h = atoi(_splitstamps[_splitstamps.size()-3].substr(0,1).c_str())*10
-            + atoi(_splitstamps[_splitstamps.size()-3].substr(1,1).c_str());
+                + atoi(_splitstamps[_splitstamps.size()-3].substr(1,1).c_str());
         start_t.m = atoi(_splitstamps[_splitstamps.size()-2].substr(0,1).c_str())*10
-            + atoi(_splitstamps[_splitstamps.size()-2].substr(1,1).c_str());
+                + atoi(_splitstamps[_splitstamps.size()-2].substr(1,1).c_str());
         start_t.s = atoi(_splitstamps[_splitstamps.size()-1].substr(0,1).c_str())*10
-            + atoi(_splitstamps[_splitstamps.size()-1].substr(1,1).c_str());
+                + atoi(_splitstamps[_splitstamps.size()-1].substr(1,1).c_str());
 
     }
 
@@ -1384,12 +1384,15 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
     }
     int video_w = (int)(cap.get(CAP_PROP_FRAME_WIDTH));
     int video_h = (int)(cap.get(CAP_PROP_FRAME_HEIGHT));
-    fps = cap.get(CAP_PROP_FPS);
+    this->fps = cap.get(CAP_PROP_FPS);
+    this->video_frames = (int)(cap.get(CAP_PROP_FRAME_COUNT));
     if(video_w == 0 || video_h == 0){
         std::stringstream msg;
         msg << "Null dimension(s) for video file " << videopath << " (x=" << video_w << " ,y=" << video_h << "), aborting";
         return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
     }
+
+    /// Check for existing csvs
 
     std::vector<std::string> csv_list,hook_list,constraint_list;
 
@@ -1715,10 +1718,10 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
         //        std::cout << "Action statement: " << _a << std::endl;
 
         forConversion = (std::find(supported_conversion_actions.begin(),supported_conversion_actions.end(),_a) != supported_conversion_actions.end())
-            && (std::find(supported_conversion_tests.begin(),supported_conversion_tests.end(),_t) != supported_conversion_tests.end()  || _t.empty());
+                && (std::find(supported_conversion_tests.begin(),supported_conversion_tests.end(),_t) != supported_conversion_tests.end()  || _t.empty());
 
         forExtraction = (std::find(supported_extraction_actions.begin(),supported_extraction_actions.end(),_a) != supported_extraction_actions.end())
-            && (std::find(supported_extraction_tests.begin(),supported_extraction_tests.end(),_t) != supported_extraction_tests.end()  || _t.empty());
+                && (std::find(supported_extraction_tests.begin(),supported_extraction_tests.end(),_t) != supported_extraction_tests.end()  || _t.empty());
 
         if(!forConversion && !forExtraction){
             std::stringstream msg;
@@ -2285,7 +2288,7 @@ void InspectorWidgetProcessor::process(){
     /*int*/ csv_frame = frame;
     int last_cap_frame = frame;
 
-   this->video_frames = (int)(cap.get(CAP_PROP_FRAME_COUNT));
+    this->video_frames = (int)(cap.get(CAP_PROP_FRAME_COUNT));
 
     //cv::Mat img;
 
@@ -3617,7 +3620,7 @@ bool InspectorWidgetProcessor::parseHookEvents(PCP::CsvConfig* cv_csv){
     return true;
 }
 
-std::string InspectorWidgetProcessor::getAnnotation(std::string name){
+std::string InspectorWidgetProcessor::getTemplateAnnotation(std::string name){
     std::string _annotation("");
     std::map<std::string, std::vector<float> >::iterator _template_val = template_vals.find(name);
     if(_template_val!=template_vals.end()){
@@ -3635,7 +3638,7 @@ std::string InspectorWidgetProcessor::getAnnotation(std::string name){
         float _val = 0;
         float __val = 0;
         int _in = 0;
-    
+
         int f=0;
         for(;f<template_vals[name].size();f++) {
             _val = (template_vals[name][f]>_threshold)?1:0;
@@ -3658,6 +3661,176 @@ std::string InspectorWidgetProcessor::getAnnotation(std::string name){
         time = (double)(stop-start)/frequency;
     }
     return _annotation;
+}
+
+std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string name){
+    if(name != "focus_application" && name != "focus_window" && name != "focus_widget_pointer"){
+        this->setStatusAndReturn("accessibility", "Wrong accessibility annotation name", "");
+        return "";
+    }
+
+    pugi::xml_document doc;
+
+    std::string axFile = datapath + videostem + ".xml";
+
+    std::ifstream iss( axFile );
+
+    iss.exceptions(std::ios::eofbit | std::ios::badbit | std::ios::failbit);
+
+    // Windows has newline translation for text-mode files, so reading from this stream reaches eof and sets fail|eof bits.
+    // This test does not cause stream to throw an exception on Linux - I have no idea how to get read() to fail except
+    // newline translation.
+    pugi::xml_parse_result result;
+
+    try
+    {
+        result = doc.load(iss);
+        //std::cout << "Stream read: " << iss.good() << std::endl; // if the exception was not thrown, stream reading should succeed without errors
+    }
+    catch (const std::ios_base::failure&)
+    {
+        //!doc.first_child();
+        std::stringstream msg;
+        msg << "Could not parse accessibility XML fil "<< axFile << std::endl;
+        this->setStatusAndReturn("accessibility", msg.str(), "");
+        return "";
+    }
+
+    if(result.status != pugi::status_ok){
+        std::stringstream msg;
+        msg << "Could not properly load XML file "<< axFile << std::endl;
+        this->setStatusAndReturn("accessibility", msg.str(), "");
+        return "";
+    }
+
+    pugi::xml_node fc = doc.first_child();
+    if(!fc.empty()){
+        std::cout << "First child '" << fc.name() << "'" << std::endl;
+    }
+
+    pugi::xml_node root = doc.child("root");
+    if(root.empty()){
+        std::stringstream msg;
+        msg << "XML document doesn't contain a root element" << std::endl;
+        this->setStatusAndReturn("accessibility", msg.str(), "");
+        return "";
+    }
+
+    std::string jsonSuffix("");
+
+    if(name == "focus_application"){
+        jsonSuffix = "AXFocusApplication";
+    }
+    else if(name == "focus_window"){
+        jsonSuffix = "AXFocusWindow";
+    }
+    else if(name == "focus_widget_pointer"){
+        jsonSuffix = "AXFocusWidgetByPointer";
+    }
+
+    StringBuffer ax_s;
+
+    PrettyWriter<StringBuffer>* ax_w = new PrettyWriter<StringBuffer>(ax_s);
+
+    header(*ax_w);
+
+    float start_t = 0;
+
+    if(name == "focus_application"){
+
+        for (pugi::xml_node n: root.children("appchange"))
+        {
+            float end_t = n.attribute("time").as_float();
+            //std::cout << "appchange " << n.attribute("name").as_string();
+            segment(*ax_w, start_t/this->fps,end_t/this->fps,this->fps, n.attribute("name").as_string() );
+            start_t = end_t;
+        }
+
+    }
+    else if(name == "focus_window"){
+
+        for (pugi::xml_node n: root.children("windowEvent"))
+        {
+            /*std::cout << n.attribute("time").as_float() << " ";*/
+            pugi::xml_node t = n.child("target");
+            if(!t.empty()){
+                float end_t = n.attribute("time").as_float();
+                //std::cout << "focus '" << t.attribute("title").as_string() << "':'" << t.attribute("app").as_string() << "' ";
+                segment(*ax_w, start_t/this->fps,end_t/this->fps,this->fps, t.attribute("title").as_string() );
+                start_t = end_t;
+            }
+            /*if(!n.child("allWindows").empty()){
+            std::cout << "among ";
+            for (pugi::xml_node w: n.child("allWindows").children()){
+                std::cout << "'" << w.attribute("title").as_string() << "':'" << w.attribute("app").as_string() << "' ";
+            }
+        }
+        std::cout << std::endl;*/
+        }
+
+    }
+    else if(name == "focus_widget_pointer"){
+        for (pugi::xml_node n: root.children("appchange"))
+        {
+            float end_t = n.attribute("time").as_float();
+            //std::cout << "under mouse";
+            pugi::xml_node t = n.first_child();
+            while(!t.empty()){
+                //std::cout << " -> " << t.name();
+                t = t.first_child();
+            }
+            segment(*ax_w, start_t/this->fps,end_t/this->fps,this->fps, t.attribute("name").as_string() );
+            start_t = end_t;
+        }
+    }
+
+    segmentfooter(*ax_w, jsonSuffix,this->video_frames, this->fps);
+
+    std::ofstream ax_f;
+    std::string ax_fp = datapath + videostem + "-" + jsonSuffix + ".json";
+    ax_f.open(ax_fp.c_str());
+
+    if(ax_f.is_open()){
+        ax_f << ax_s.GetString();
+        ax_f.close();
+    }
+
+    return ax_s.GetString();
+
+    /*for (pugi::xml_node n: root.children())
+    {
+        //std::cout << n.name() << " " << strcmp(n.name(),"windowEvent")  << " "  << n.attribute("type").as_string() << " " << n.attribute("time").as_float() << std::endl;
+        std::cout << n.attribute("time").as_float() << " ";
+        if( strcmp(n.name(),"appchange") == 0 ){
+            std::cout << "appchange " << n.attribute("name").as_string();
+        }
+        else if( strcmp(n.name(),"windowEvent") == 0 ){
+            pugi::xml_node t = n.child("target");
+            if(!t.empty()){
+                std::cout << "focus '" << t.attribute("title").as_string() << "':'" << t.attribute("app").as_string() << "' ";
+            }
+            if(!n.child("allWindows").empty()){
+                std::cout << "among ";
+                for (pugi::xml_node w: n.child("allWindows").children()){
+                    std::cout << "'" << w.attribute("title").as_string() << "':'" << w.attribute("app").as_string() << "' ";
+                }
+            }
+
+        }
+        else if( strcmp(n.name(),"mouse") == 0 ){
+            std::cout << "under mouse";
+            pugi::xml_node t = n.first_child();
+            while(!t.empty()){
+                std::cout << " -> " << t.name();
+                t = t.first_child();
+            }
+        }
+        else{
+            std::cout << n.name();
+        }
+        std::cout << std::endl;
+    }*/
+
 }
 
 bool InspectorWidgetProcessor::parseComputerVisionEvents(PCP::CsvConfig* cv_csv){
@@ -3803,7 +3976,7 @@ bool InspectorWidgetProcessor::parseComputerVisionEvents(PCP::CsvConfig* cv_csv)
                                     0.5*(float)rx[i]/(float)video_x,
                                     0.5*(float)ry[i]/(float)video_y,
                                     label[i]
-                                   );
+                                    );
                         }
 
                         in[i] = _in;
@@ -3822,7 +3995,7 @@ bool InspectorWidgetProcessor::parseComputerVisionEvents(PCP::CsvConfig* cv_csv)
                                     0.05,
                                     0.05,
                                     num[i]
-                                   );
+                                    );
                         }
                         in[i] = _in;
                         num[i] = _num;
@@ -3841,7 +4014,7 @@ bool InspectorWidgetProcessor::parseComputerVisionEvents(PCP::CsvConfig* cv_csv)
                                     0.05,
                                     0.05,
                                     txt[i]
-                                   );
+                                    );
                         }
                         in[i] = _in;
                         txt[i] = _txt;
@@ -3901,7 +4074,7 @@ bool InspectorWidgetProcessor::parseComputerVisionEvents(PCP::CsvConfig* cv_csv)
                     0.5*(float)rx[i]/(float)video_x,
                     0.5*(float)ry[i]/(float)video_y,
                     label[i]
-                   );
+                    );
         }
         else if(label_type[i] == "num" && num[i]!=" " && !num[i].empty() ){
             segment(*(w_s[i]), in[i], _in, this->fps, num[i]);
@@ -3911,7 +4084,7 @@ bool InspectorWidgetProcessor::parseComputerVisionEvents(PCP::CsvConfig* cv_csv)
                     0.05,
                     0.05,
                     num[i]
-                   );
+                    );
         }
         else if(label_type[i] == "txt" && txt[i]!=" "  && !txt[i].empty()){
             segment(*(w_s[i]), in[i], _in, this->fps, txt[i]);
@@ -3921,7 +4094,7 @@ bool InspectorWidgetProcessor::parseComputerVisionEvents(PCP::CsvConfig* cv_csv)
                     0.05,
                     0.05,
                     txt[i]
-                   );
+                    );
         }
         //std::cout << " " << row[i] << "\t";
     }

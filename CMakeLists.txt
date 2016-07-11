@@ -189,6 +189,9 @@ include_directories(${CMAKE_SOURCE_DIR}/3rdparty/github-InspectorWidget-libuioho
 add_subdirectory(3rdparty/github-InspectorWidget-PEGTL)
 include_directories(${CMAKE_SOURCE_DIR}/3rdparty/github-InspectorWidget-PEGTL)
 
+add_subdirectory(3rdparty/github-InspectorWidget-pugixml)
+include_directories(${CMAKE_SOURCE_DIR}/3rdparty/github-InspectorWidget-pugixml/src)
+
 ######################
 # INTERNAL LIBRARIES #
 ######################

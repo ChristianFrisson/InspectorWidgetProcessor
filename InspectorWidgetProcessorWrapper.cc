@@ -8,7 +8,7 @@
 #include <vector>
 
 class InspectorWidgetProcessorAsyncWorker : public Nan::AsyncWorker {
-    public:
+public:
     InspectorWidgetProcessorAsyncWorker(Nan::Callback *callback, InspectorWidgetProcessor* server, std::vector<std::string> args)
         : Nan::AsyncWorker(callback), server(server), args(args),estimate(0) {}
     ~InspectorWidgetProcessorAsyncWorker() {}
@@ -45,13 +45,13 @@ class InspectorWidgetProcessorAsyncWorker : public Nan::AsyncWorker {
         v8::Local<v8::Value> argv[] = {
             id,
             error /*Nan::Null()*/
-                ,success /*Nan::Null()*/
+            ,success /*Nan::Null()*/
         };
 
         callback->Call(3, argv);
     }
 
-    private:
+private:
     InspectorWidgetProcessor* server;
     std::vector<std::string> args;
     double estimate;
@@ -78,7 +78,8 @@ void InspectorWidgetProcessorWrapper::Init(v8::Local<v8::Object> exports) {
     Nan::SetPrototypeMethod(tpl, "run", Run);
     Nan::SetPrototypeMethod(tpl, "abort", Abort);
     Nan::SetPrototypeMethod(tpl, "status", Status);
-    Nan::SetPrototypeMethod(tpl, "annotationStatus", AnnotationStatus);
+    Nan::SetPrototypeMethod(tpl, "templateAnnotationStatus", TemplateAnnotationStatus);
+    Nan::SetPrototypeMethod(tpl, "accessibilityAnnotationStatus", AccessibilityAnnotationStatus);
 
     constructor.Reset(tpl->GetFunction());
     exports->Set(Nan::New("InspectorWidgetProcessor").ToLocalChecked(), tpl->GetFunction());
@@ -99,7 +100,7 @@ void InspectorWidgetProcessorWrapper::New(const Nan::FunctionCallbackInfo<v8::Va
     }
     std::cout << "new InspectorWidgetProcessor() " << std::endl;
     InspectorWidgetProcessorWrapper* obj = ObjectWrap::Unwrap<InspectorWidgetProcessorWrapper>(info.Holder());
-    obj->createServer();   
+    obj->createServer();
 }
 
 void InspectorWidgetProcessorWrapper::Run(const Nan::FunctionCallbackInfo<v8::Value>& info) {
@@ -231,9 +232,9 @@ void InspectorWidgetProcessorWrapper::Status(const Nan::FunctionCallbackInfo<v8:
     v8::Local<v8::Value> argv[] = {
         id,
         error /*Nan::Null()*/
-            ,success /*Nan::Null()*/
-                ,phase
-                    ,progress
+        ,success /*Nan::Null()*/
+        ,phase
+        ,progress
     };
 
     callback->Call(5, argv);
@@ -241,7 +242,7 @@ void InspectorWidgetProcessorWrapper::Status(const Nan::FunctionCallbackInfo<v8:
 
 }
 
-void InspectorWidgetProcessorWrapper::AnnotationStatus(const Nan::FunctionCallbackInfo<v8::Value>& info) {
+void InspectorWidgetProcessorWrapper::TemplateAnnotationStatus(const Nan::FunctionCallbackInfo<v8::Value>& info) {
     int argc = info.Length();
     if (argc != 3) {
         Nan::ThrowTypeError("Wrong number of arguments");
@@ -277,13 +278,12 @@ void InspectorWidgetProcessorWrapper::AnnotationStatus(const Nan::FunctionCallba
     v8::Local<v8::Value> phase = Nan::Null();
     v8::Local<v8::Value> progress = Nan::Null();
     v8::Local<v8::Value> annotation = Nan::Null();
-    //std::cout << "obj->getServer() " << obj->getServer() << std::endl;
     if(obj->getServer()){
         std::string error_string = obj->getServer()->getStatusError();
         std::string success_string = obj->getServer()->getStatusSuccess();
         std::string phase_string = obj->getServer()->getStatusPhase();
         float progress_float = obj->getServer()->getStatusProgress();
-        std::string annotation_string = obj->getServer()->getAnnotation(args[1]);
+        std::string annotation_string = obj->getServer()->getTemplateAnnotation(args[1]);
         //std::cout << "InspectorWidgetProcessorWrapper: error " << error_string  << " success " << success_string << " phase " << phase_string << std::endl;
         error = Nan::New(error_string.c_str()).ToLocalChecked();
         success = Nan::New(success_string).ToLocalChecked();
@@ -298,12 +298,71 @@ void InspectorWidgetProcessorWrapper::AnnotationStatus(const Nan::FunctionCallba
     v8::Local<v8::Value> argv[] = {
         id,
         error /*Nan::Null()*/
-            ,annotation /*Nan::Null()*/
-                ,phase
-                    ,progress
+        ,annotation /*Nan::Null()*/
+        ,phase
+        ,progress
     };
 
     callback->Call(5, argv);
 
 
+}
+
+void InspectorWidgetProcessorWrapper::AccessibilityAnnotationStatus(const Nan::FunctionCallbackInfo<v8::Value>& info) {
+    int argc = info.Length();
+    if (argc != 3) {
+        Nan::ThrowTypeError("Wrong number of arguments");
+        return;
+    }
+    for (int i=0; i<argc-1; i++){
+        if(!info[i]->IsString()){
+            std::stringstream error;
+            error << "Argument " << i << " should be a string";
+            Nan::ThrowTypeError(error.str().c_str());
+            return;
+        }
+    }
+    if(!info[argc-1]->IsFunction()){
+        Nan::ThrowTypeError("The last argument should be a callback function");
+        return;
+    }
+
+    std::vector<std::string> args;
+    for (int i=0; i<argc-1; i++){
+        v8::String::Utf8Value arg(info[i]);
+        std::string buffer  = std::string(*arg);
+        //std::cout << "Buffer '" << buffer << "'" << std::endl;
+        args.push_back(buffer);
+    }
+    
+    Nan::Callback *callback = new Nan::Callback(info[argc-1].As<v8::Function>());
+
+    InspectorWidgetProcessorWrapper* obj = ObjectWrap::Unwrap<InspectorWidgetProcessorWrapper>(info.Holder());
+
+    v8::Local<v8::Value> error = Nan::Null();
+    v8::Local<v8::Value> success = Nan::Null();
+    //v8::Local<v8::Value> phase = Nan::Null();
+    //v8::Local<v8::Value> progress = Nan::Null();
+    v8::Local<v8::Value> annotation = Nan::Null();
+    if(obj->getServer()){
+        std::string error_string = obj->getServer()->getStatusError();
+        std::string success_string = obj->getServer()->getStatusSuccess();
+        std::string phase_string = obj->getServer()->getStatusPhase();
+        std::string annotation_string = obj->getServer()->getAccessibilityAnnotation(args[1]);
+        //std::cout << "InspectorWidgetProcessorWrapper: error " << error_string  << " success " << success_string << " phase " << phase_string << std::endl;
+        error = Nan::New(error_string.c_str()).ToLocalChecked();
+        success = Nan::New(success_string).ToLocalChecked();
+        //phase = Nan::New(phase_string).ToLocalChecked();
+        //progress = Nan::New(progress_float);
+        annotation = Nan::New(annotation_string).ToLocalChecked();
+    }
+    v8::Local<v8::Value> id = Nan::New(args[0]).ToLocalChecked();
+
+    v8::Local<v8::Value> argv[] = {
+        id
+        ,error
+        ,annotation
+    };
+
+    callback->Call(3, argv);
 }
