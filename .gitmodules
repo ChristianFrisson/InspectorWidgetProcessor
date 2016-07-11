@@ -10,3 +10,6 @@
 [submodule "3rdparty/github-InspectorWidget-rapidjson"]
 	path = 3rdparty/github-InspectorWidget-rapidjson
 	url = https://github.com/InspectorWidget/rapidjson.git
+[submodule "3rdparty/github-InspectorWidget-pugixml"]
+	path = 3rdparty/github-InspectorWidget-pugixml
+	url = https://github.com/InspectorWidget/pugixml.git
