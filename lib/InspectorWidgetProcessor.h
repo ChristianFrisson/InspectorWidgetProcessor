@@ -101,6 +101,8 @@ class InspectorWidgetProcessor{
     float getStatusProgress();
     bool setStatusAndReturn(std::string phase, std::string error_message = "", std::string success_message = "" );
 
+	float getElapsedSeconds(float timestamp);
+
     std::string getTemplateAnnotation(std::string name);
 
     std::string getAccessibilityAnnotation(std::string name);
@@ -114,6 +116,7 @@ class InspectorWidgetProcessor{
     void clear();    
 
     bool parseComputerVisionEvents(PCP::CsvConfig* cv_csv);
+    bool parseClockTimestampsFile(std::string _path);
     bool parseFirstMinuteFrameFile(PCP::CsvConfig* cv_csv);
     bool parseHookEvents(PCP::CsvConfig* cv_csv);
     bool parseFilterings( std::vector<std::string>& filtering_list);
@@ -210,6 +213,11 @@ class InspectorWidgetProcessor{
 
     InspectorWidgetTime start_t,end_t;
     InspectorWidgetDate start_d;
+    uint64 start_clock;
+    uint64 end_clock;
+
+    std::map<int, uint64> ts_time;
+    std::map<int, uint64> ts_clock;
 
     std::list<std::string> template_matching_logged_dep_list;
     std::map<std::string,std::vector<std::string> > template_matching_logged_dep_map;

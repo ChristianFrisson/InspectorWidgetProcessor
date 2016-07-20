@@ -211,6 +211,17 @@ void header(PrettyWriter<StringBuffer>& writer){
     writer.StartArray();
 }
 
+void event(PrettyWriter<StringBuffer>& writer, float in, float fps, std::string label){
+
+    writer.StartObject();
+    writer.String("label");
+    writer.String(label.c_str());
+    writer.String("tc");
+    writer.String(frames2tc(in,fps).c_str());
+    writer.String("tclevel");
+    writer.Double(1.0);
+    writer.EndObject();
+}
 
 void segment(PrettyWriter<StringBuffer>& writer, float in, float out, float fps, std::string label){
 
@@ -224,7 +235,6 @@ void segment(PrettyWriter<StringBuffer>& writer, float in, float out, float fps,
     writer.String("tclevel");
     writer.Double(1.0);
     writer.EndObject();
-
 }
 
 void overlay(PrettyWriter<StringBuffer>& writer, float in, float out, float fps, float x, float y, float rx, float ry, std::string label){
@@ -263,6 +273,40 @@ void overlay(PrettyWriter<StringBuffer>& writer, float in, float out, float fps,
 
 }
 
+void eventfooter(PrettyWriter<StringBuffer>& writer, std::string id, float out, float fps){
+    writer.EndArray();
+    writer.EndObject();
+
+    writer.String("type");
+    writer.String("events");
+    writer.String("tcin");
+    writer.String("00:00:00.0000");
+    writer.String("tcout");
+    writer.String(frames2tc(out,fps).c_str());
+    writer.String("tclevel");
+    writer.Double(0);
+
+    writer.EndObject();
+    writer.EndArray();
+
+    writer.String("id");
+    writer.String((id+"-events").c_str());
+    writer.String("type");
+    writer.String("events");
+
+    writer.String("algorithm");
+    writer.String("InspectorWidget Events");
+    writer.String("processor");
+    writer.String("InspectorWidget Processor");
+    writer.String("processed");
+    writer.Uint64(11421141589286);
+    writer.String("version");
+    writer.Double(1);
+
+    writer.EndObject();
+
+}
+
 void segmentfooter(PrettyWriter<StringBuffer>& writer, std::string id, float out, float fps){
     writer.EndArray();
     writer.EndObject();
@@ -285,9 +329,9 @@ void segmentfooter(PrettyWriter<StringBuffer>& writer, std::string id, float out
     writer.String("segments");
 
     writer.String("algorithm");
-    writer.String("InspectorWidget Template Matching (Segments)");
+    writer.String("InspectorWidget Segments");
     writer.String("processor");
-    writer.String("University of Mons - Christian Frisson");
+    writer.String("InspectorWidget Processor");
     writer.String("processed");
     writer.Uint64(11421141589286);
     writer.String("version");
@@ -319,9 +363,9 @@ void overlayfooter(PrettyWriter<StringBuffer>& writer, std::string id, float out
     writer.String("visual_tracking");
 
     writer.String("algorithm");
-    writer.String("InspectorWidget Template Matching (Overlay)");
+    writer.String("InspectorWidget Overlays");
     writer.String("processor");
-    writer.String("University of Mons - Christian Frisson");
+    writer.String("InspectorWidget Processor");
     writer.String("processed");
     writer.Uint64(11421141589286);
     writer.String("version");
@@ -394,7 +438,12 @@ void InspectorWidgetProcessor::clear(){
     current_frame = 0;
     start_h = 0;
     start_m = 0;
+    start_clock = 0;
+    end_clock = 0;
     first_minute_frames = -1;
+
+    ts_time.clear();
+    ts_clock.clear();
     
     templates.clear();
     gray_templates.clear();
@@ -1362,9 +1411,8 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
 
     }
 
-
-    std::cout << "Timestamp encoded in file name: '" << start_d.y << "/" << start_d.m << "/"  << start_d.d << "'" << std::endl;
-    std::cout << "Timestamp encoded in file name: '" << start_t.h << ":"  << start_t.m << ":"  << start_t.s << "'" << std::endl;
+    std::cout << "Timestamp encoded in file name: '" << start_d.y << "/" << start_d.m << "/"  << start_d.d << "' '";
+    std::cout << start_t.h << ":"  << start_t.m << ":"  << start_t.s << "'" << std::endl;
 
     ///
 
@@ -1392,7 +1440,28 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
         return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
     }
 
-    /// Check for existing csvs
+    /// Check for existing clock timestamps in tsv file
+    //std::string tspath = datapath + videostem + "/tsv/" + videostem + ".tsv";
+    std::string tspath = datapath + videostem + ".tsv";
+    bool ts_success = this->parseClockTimestampsFile(tspath);
+
+    if(!ts_success){
+        std::stringstream msg;
+        msg << "Error while parsing clock timestamps file " << tspath << " , aborting";
+        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+    }
+
+    this->end_clock = this->start_clock + 1000000000*(this->video_frames/this->fps);
+
+    int ts_time_size = this->ts_time.size();
+    int ts_clock_size = this->ts_clock.size();
+    if(this->video_frames - ts_time_size > 1 || this->video_frames - ts_clock_size > 1){
+        std::stringstream msg;
+        msg << "Clock timestamps size " << ts_clock_size << " mismatch with video frame size " << this->video_frames << " , aborting";
+        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+    }
+
+    /// Parse remaining arguments
 
     std::vector<std::string> csv_list,hook_list,constraint_list;
 
@@ -1427,6 +1496,8 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
             constraint_list.push_back(_constraint);*/
         }
     }
+
+    /// Check for existing csvs
 
     int stop;
     double time;
@@ -1622,6 +1693,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
 
     for(std::vector<std::string>::iterator _constraint = constraint_list.begin(); _constraint!= constraint_list.end();_constraint++){
         std::string _c = *_constraint;
+
         std::cout << "Constraint: " << _c << std::endl;
 
         std::string _t,_v;
@@ -3356,6 +3428,38 @@ bool InspectorWidgetProcessor::applyFilterings(){
     return 0;
 }
 
+bool InspectorWidgetProcessor::parseClockTimestampsFile(std::string _path){
+
+    // instantiate parser
+    PCP::CsvConfig* tsv_config;
+    try{
+        tsv_config = new PCP::CsvConfig(_path.c_str(), false, '\t');
+    }
+    catch(...){
+        std::stringstream msg;
+        msg <<  "Couldn't open " << _path;
+        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+    }
+    PCP::PartialCsvParser parser(*tsv_config);
+
+    bool first_row = true;
+
+    // parse & print body lines
+    std::vector<std::string> row;
+    while (!(row = parser.get_row()).empty()) {
+        if(row.size() == 3){
+            if(first_row){
+                ts_time.clear();
+                ts_clock.clear();
+                start_clock = std::stoull(row[2]);
+                first_row = false;
+            }
+            ts_time[atoi(row[0].c_str())] = std::stoull(row[1]);
+            ts_clock[atoi(row[0].c_str())] = std::stoull(row[2]);
+        }
+    }
+    return true;
+}
 
 bool InspectorWidgetProcessor::parseFirstMinuteFrameFile(PCP::CsvConfig* cv_csv){
     if(!cv_csv){
@@ -3451,9 +3555,6 @@ bool InspectorWidgetProcessor::parseHookEvents(PCP::CsvConfig* cv_csv){
                 if( daily_sec_from_now >= daily_sec_from_start && daily_sec_from_now <= daily_sec_from_end){
 
                     //std::cout << "when: " << now->tm_hour << "h " << now->tm_min << "m "  << tm_sec << "s " << std::endl;
-
-                    if(whensec == 1427809756.977 || whensec == 1427810230.729) // spaceship || Cmd+Fpop
-                        bool stophere = true;
 
                     bool cur_event_is_mouse = false;
                     bool cur_event_is_keyboard = false;
@@ -3663,8 +3764,34 @@ std::string InspectorWidgetProcessor::getTemplateAnnotation(std::string name){
     return _annotation;
 }
 
+
+
+float InspectorWidgetProcessor::getElapsedSeconds(float timestamp){
+
+    struct tm _start_tm;
+    _start_tm.tm_year = this->start_d.y - 1900;
+    _start_tm.tm_mon = this->start_d.m - 1;
+    _start_tm.tm_mday = this->start_d.d;
+    _start_tm.tm_hour = this->start_t.h;
+    _start_tm.tm_min = this->start_t.m;
+    _start_tm.tm_sec = this->start_t.s;
+    std::cout << "Begin " << this->start_d.y << " " << this->start_d.m << " " << this->start_d.d << " " << this->start_t.h << " " << this->start_t.m << " " << this->start_t.s << std::endl;
+
+    time_t _start_t = mktime(&_start_tm);
+
+    time_t _end_t = (long)(timestamp);
+    struct tm * _end_tm = localtime( & _end_t );
+    std::cout << "End " << _end_tm->tm_year + 1900 << " " << _end_tm->tm_mon + 1 << " " << _end_tm->tm_mday << " " << _end_tm->tm_hour << " " << _end_tm->tm_min << " " << _end_tm->tm_sec << std::endl;
+
+    double _diff = difftime(_start_t,_end_t);
+
+    std::cout << "Diff " << _diff << " " << this->start_t.s - (int) (this->start_t.s) << " " <<  timestamp -  (long)(timestamp) << " " << timestamp << std::endl;
+
+    return _diff;
+}
+
 std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string name){
-    if(name != "focus_application" && name != "focus_window" && name != "focus_widget_pointer"){
+    if(name != "focus_application" && name != "focus_window" && name != "pointed_widget"){
         this->setStatusAndReturn("accessibility", "Wrong accessibility annotation name", "");
         return "";
     }
@@ -3691,7 +3818,7 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
     {
         //!doc.first_child();
         std::stringstream msg;
-        msg << "Could not parse accessibility XML fil "<< axFile << std::endl;
+        msg << "Could not parse accessibility XML file "<< axFile << std::endl;
         this->setStatusAndReturn("accessibility", msg.str(), "");
         return "";
     }
@@ -3704,8 +3831,11 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
     }
 
     pugi::xml_node fc = doc.first_child();
-    if(!fc.empty()){
-        std::cout << "First child '" << fc.name() << "'" << std::endl;
+    if(fc.empty()){
+        std::stringstream msg;
+        msg << "XML file "<< axFile << " is empty, aborting." << std::endl;
+        this->setStatusAndReturn("accessibility", msg.str(), "");
+        return "";
     }
 
     pugi::xml_node root = doc.child("root");
@@ -3724,8 +3854,8 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
     else if(name == "focus_window"){
         jsonSuffix = "AXFocusWindow";
     }
-    else if(name == "focus_widget_pointer"){
-        jsonSuffix = "AXFocusWidgetByPointer";
+    else if(name == "pointed_widget"){
+        jsonSuffix = "AXPointedWidget";
     }
 
     StringBuffer ax_s;
@@ -3734,57 +3864,92 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
 
     header(*ax_w);
 
-    float start_t = 0;
+    double _start_t = 0;
 
     if(name == "focus_application"){
 
+        std::string _name("");
+
         for (pugi::xml_node n: root.children("appchange"))
         {
-            float end_t = n.attribute("time").as_float();
+            uint64_t _clock = n.attribute("clock").as_llong();
             //std::cout << "appchange " << n.attribute("name").as_string();
-            segment(*ax_w, start_t/this->fps,end_t/this->fps,this->fps, n.attribute("name").as_string() );
-            start_t = end_t;
+            if(_clock > this->end_clock){
+                break;
+            }
+            if(_clock > this->start_clock && _clock < this->end_clock){
+                double _end_t = double(_clock - this->start_clock )/1000000000.0;
+                segment(*ax_w, _start_t*this->fps,_end_t*this->fps,this->fps, _name );
+                _start_t = _end_t;
+            }
+            _name = n.attribute("name").as_string();
         }
-
+        if(_start_t > 0){
+            double _end_t = double(this->end_clock - this->start_clock )/1000000000.0;
+            segment(*ax_w, _start_t*this->fps,_end_t*this->fps,this->fps, _name );
+        }
+        segmentfooter(*ax_w, jsonSuffix,this->video_frames, this->fps);
     }
     else if(name == "focus_window"){
+
+        std::string _title("");
 
         for (pugi::xml_node n: root.children("windowEvent"))
         {
             /*std::cout << n.attribute("time").as_float() << " ";*/
+            uint64_t _clock = n.attribute("clock").as_llong();
+            if(_clock > this->end_clock){
+                break;
+            }
             pugi::xml_node t = n.child("target");
             if(!t.empty()){
-                float end_t = n.attribute("time").as_float();
-                //std::cout << "focus '" << t.attribute("title").as_string() << "':'" << t.attribute("app").as_string() << "' ";
-                segment(*ax_w, start_t/this->fps,end_t/this->fps,this->fps, t.attribute("title").as_string() );
-                start_t = end_t;
-            }
-            /*if(!n.child("allWindows").empty()){
-            std::cout << "among ";
-            for (pugi::xml_node w: n.child("allWindows").children()){
-                std::cout << "'" << w.attribute("title").as_string() << "':'" << w.attribute("app").as_string() << "' ";
-            }
-        }
-        std::cout << std::endl;*/
-        }
+                //std::cout << "appchange " << n.attribute("name").as_string();
 
+                if(_clock > this->start_clock && _clock < this->end_clock){
+                    double _end_t = double(_clock - this->start_clock )/1000000000.0;
+                    //std::cout << "focus '" << t.attribute("title").as_string() << "':'" << t.attribute("app").as_string() << "' ";
+                    segment(*ax_w, _start_t*this->fps,_end_t*this->fps, this->fps, _title );
+                    _start_t = _end_t;
+                }
+                _title = t.attribute("title").as_string();
+            }
+        }
+        if(_start_t > 0){
+            double _end_t = double(this->end_clock - this->start_clock )/1000000000.0;
+            segment(*ax_w, _start_t*this->fps,_end_t*this->fps,this->fps, _title );
+        }
+        segmentfooter(*ax_w, jsonSuffix,this->video_frames, this->fps);
     }
-    else if(name == "focus_widget_pointer"){
-        for (pugi::xml_node n: root.children("appchange"))
+    else if(name == "pointed_widget"){
+        std::string _name("");
+        for (pugi::xml_node n: root.children("mouse"))
         {
-            float end_t = n.attribute("time").as_float();
-            //std::cout << "under mouse";
-            pugi::xml_node t = n.first_child();
-            while(!t.empty()){
-                //std::cout << " -> " << t.name();
-                t = t.first_child();
+            uint64_t _clock = n.attribute("clock").as_llong();
+            //std::cout << "appchange " << n.attribute("name").as_string();
+            if(_clock > this->end_clock){
+                break;
             }
-            segment(*ax_w, start_t/this->fps,end_t/this->fps,this->fps, t.attribute("name").as_string() );
-            start_t = end_t;
-        }
-    }
+            if(_clock > this->start_clock && _clock < this->end_clock){
+                double _event_t = double(_clock - this->start_clock )/1000000000.0;
+                //std::cout << "under mouse";
+                try{
+                    pugi::xpath_node tpath = n.select_single_node(".//*[@selected='YES']");
 
-    segmentfooter(*ax_w, jsonSuffix,this->video_frames, this->fps);
+                    if (tpath)
+                    {
+                        pugi::xml_node t = tpath.node();
+                        //std::cout << " -> " << t.name() << std::endl;
+                        _name = std::string(t.name()) + ": " + t.attribute("AXTitle").as_string();
+                     }
+                }
+                catch(...){
+                    std::cout << "Bad xpath" << std::endl;
+                }
+                event(*ax_w, _event_t*this->fps, this->fps, _name );
+            }
+        }
+        eventfooter(*ax_w, jsonSuffix,this->video_frames, this->fps);
+    }
 
     std::ofstream ax_f;
     std::string ax_fp = datapath + videostem + "-" + jsonSuffix + ".json";
@@ -3796,41 +3961,6 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
     }
 
     return ax_s.GetString();
-
-    /*for (pugi::xml_node n: root.children())
-    {
-        //std::cout << n.name() << " " << strcmp(n.name(),"windowEvent")  << " "  << n.attribute("type").as_string() << " " << n.attribute("time").as_float() << std::endl;
-        std::cout << n.attribute("time").as_float() << " ";
-        if( strcmp(n.name(),"appchange") == 0 ){
-            std::cout << "appchange " << n.attribute("name").as_string();
-        }
-        else if( strcmp(n.name(),"windowEvent") == 0 ){
-            pugi::xml_node t = n.child("target");
-            if(!t.empty()){
-                std::cout << "focus '" << t.attribute("title").as_string() << "':'" << t.attribute("app").as_string() << "' ";
-            }
-            if(!n.child("allWindows").empty()){
-                std::cout << "among ";
-                for (pugi::xml_node w: n.child("allWindows").children()){
-                    std::cout << "'" << w.attribute("title").as_string() << "':'" << w.attribute("app").as_string() << "' ";
-                }
-            }
-
-        }
-        else if( strcmp(n.name(),"mouse") == 0 ){
-            std::cout << "under mouse";
-            pugi::xml_node t = n.first_child();
-            while(!t.empty()){
-                std::cout << " -> " << t.name();
-                t = t.first_child();
-            }
-        }
-        else{
-            std::cout << n.name();
-        }
-        std::cout << std::endl;
-    }*/
-
 }
 
 bool InspectorWidgetProcessor::parseComputerVisionEvents(PCP::CsvConfig* cv_csv){
