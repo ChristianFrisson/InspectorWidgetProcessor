@@ -3864,8 +3864,6 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
 
     header(*ax_w);
 
-    double _start_t = 0;
-
     if(name == "focus_application"){
 
         std::string _name("");
@@ -3878,22 +3876,15 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
                 break;
             }
             if(_clock > this->start_clock && _clock < this->end_clock){
-                double _end_t = double(_clock - this->start_clock )/1000000000.0;
-                segment(*ax_w, _start_t*this->fps,_end_t*this->fps,this->fps, _name );
-                _start_t = _end_t;
+                _name = n.attribute("name").as_string();
+                double _event_t = double(_clock - this->start_clock )/1000000000.0;
+                event(*ax_w, _event_t*this->fps,this->fps, _name );
             }
-            _name = n.attribute("name").as_string();
         }
-        if(_start_t > 0){
-            double _end_t = double(this->end_clock - this->start_clock )/1000000000.0;
-            segment(*ax_w, _start_t*this->fps,_end_t*this->fps,this->fps, _name );
-        }
-        segmentfooter(*ax_w, jsonSuffix,this->video_frames, this->fps);
+        eventfooter(*ax_w, jsonSuffix,this->video_frames, this->fps);
     }
     else if(name == "focus_window"){
-
         std::string _title("");
-
         for (pugi::xml_node n: root.children("windowEvent"))
         {
             /*std::cout << n.attribute("time").as_float() << " ";*/
@@ -3904,21 +3895,15 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
             pugi::xml_node t = n.child("target");
             if(!t.empty()){
                 //std::cout << "appchange " << n.attribute("name").as_string();
-
                 if(_clock > this->start_clock && _clock < this->end_clock){
-                    double _end_t = double(_clock - this->start_clock )/1000000000.0;
+                    _title = t.attribute("title").as_string();
+                    double _event_t = double(_clock - this->start_clock )/1000000000.0;
                     //std::cout << "focus '" << t.attribute("title").as_string() << "':'" << t.attribute("app").as_string() << "' ";
-                    segment(*ax_w, _start_t*this->fps,_end_t*this->fps, this->fps, _title );
-                    _start_t = _end_t;
+                    event(*ax_w, _event_t*this->fps, this->fps, _title );
                 }
-                _title = t.attribute("title").as_string();
             }
         }
-        if(_start_t > 0){
-            double _end_t = double(this->end_clock - this->start_clock )/1000000000.0;
-            segment(*ax_w, _start_t*this->fps,_end_t*this->fps,this->fps, _title );
-        }
-        segmentfooter(*ax_w, jsonSuffix,this->video_frames, this->fps);
+        eventfooter(*ax_w, jsonSuffix,this->video_frames, this->fps);
     }
     else if(name == "pointed_widget"){
         std::string _name("");
