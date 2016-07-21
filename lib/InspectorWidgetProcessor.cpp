@@ -3884,6 +3884,7 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
         eventfooter(*ax_w, jsonSuffix,this->video_frames, this->fps);
     }
     else if(name == "focus_window"){
+        uint64_t _last_clock = 0;
         std::string _title("");
         for (pugi::xml_node n: root.children("windowEvent"))
         {
@@ -3895,12 +3896,13 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
             pugi::xml_node t = n.child("target");
             if(!t.empty()){
                 //std::cout << "appchange " << n.attribute("name").as_string();
-                if(_clock > this->start_clock && _clock < this->end_clock){
+                if(_clock > this->start_clock && _clock < this->end_clock && _last_clock != _clock){
                     _title = t.attribute("title").as_string();
                     double _event_t = double(_clock - this->start_clock )/1000000000.0;
                     //std::cout << "focus '" << t.attribute("title").as_string() << "':'" << t.attribute("app").as_string() << "' ";
                     event(*ax_w, _event_t*this->fps, this->fps, _title );
                 }
+                _last_clock = _clock;
             }
         }
         eventfooter(*ax_w, jsonSuffix,this->video_frames, this->fps);
