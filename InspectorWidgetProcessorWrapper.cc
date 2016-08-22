@@ -80,6 +80,7 @@ void InspectorWidgetProcessorWrapper::Init(v8::Local<v8::Object> exports) {
     Nan::SetPrototypeMethod(tpl, "status", Status);
     Nan::SetPrototypeMethod(tpl, "templateAnnotationStatus", TemplateAnnotationStatus);
     Nan::SetPrototypeMethod(tpl, "accessibilityAnnotationStatus", AccessibilityAnnotationStatus);
+    Nan::SetPrototypeMethod(tpl, "accessibilityUnderMouse", AccessibilityUnderMouse);
 
     constructor.Reset(tpl->GetFunction());
     exports->Set(Nan::New("InspectorWidgetProcessor").ToLocalChecked(), tpl->GetFunction());
@@ -365,4 +366,67 @@ void InspectorWidgetProcessorWrapper::AccessibilityAnnotationStatus(const Nan::F
     };
 
     callback->Call(3, argv);
+}
+
+void InspectorWidgetProcessorWrapper::AccessibilityUnderMouse(const Nan::FunctionCallbackInfo<v8::Value>& info) {
+    int argc = info.Length();
+    if (argc != 5) {
+        Nan::ThrowTypeError("Wrong number of arguments");
+        return;
+    }
+    /*for (int i=0; i<argc-1; i++){
+        if(!info[i]->IsString()){
+            std::stringstream error;
+            error << "Argument " << i << " should be a string";
+            Nan::ThrowTypeError(error.str().c_str());
+            return;
+        }
+    }*/
+    if(!info[argc-1]->IsFunction()){
+        Nan::ThrowTypeError("The last argument should be a callback function");
+        return;
+    }
+
+    std::vector<std::string> args;
+    for (int i=0; i<argc-1; i++){
+        v8::String::Utf8Value arg(info[i]);
+        std::string buffer  = std::string(*arg);
+        //std::cout << "Buffer '" << buffer << "'" << std::endl;
+        args.push_back(buffer);
+    }
+
+    Nan::Callback *callback = new Nan::Callback(info[argc-1].As<v8::Function>());
+
+    InspectorWidgetProcessorWrapper* obj = ObjectWrap::Unwrap<InspectorWidgetProcessorWrapper>(info.Holder());
+
+    v8::Local<v8::Value> error = Nan::Null();
+    v8::Local<v8::Value> success = Nan::Null();
+    v8::Local<v8::Value> x = Nan::Null();
+    v8::Local<v8::Value> y = Nan::Null();
+    v8::Local<v8::Value> w = Nan::Null();
+    v8::Local<v8::Value> h = Nan::Null();
+    if(obj->getServer()){
+        std::string error_string = obj->getServer()->getStatusError();
+        std::string success_string = obj->getServer()->getStatusSuccess();
+        std::string phase_string = obj->getServer()->getStatusPhase();
+        std::vector<float> rect = obj->getServer()->getAccessibilityUnderMouse(atof(args[1].c_str()),atof(args[2].c_str()),atof(args[3].c_str()));
+        //std::cout << "InspectorWidgetProcessorWrapper: error " << error_string  << " success " << success_string << " phase " << phase_string << std::endl;
+        error = Nan::New(error_string.c_str()).ToLocalChecked();
+        success = Nan::New(success_string).ToLocalChecked();
+        x = Nan::New(rect[0]);
+        y = Nan::New(rect[1]);
+        w = Nan::New(rect[2]);
+        h = Nan::New(rect[3]);
+    }
+    v8::Local<v8::Value> id = Nan::New(args[0]).ToLocalChecked();
+
+    v8::Local<v8::Value> argv[] = {
+        id
+        ,error
+        ,x
+        ,y
+        ,w
+        ,h
+    };
+    callback->Call(6, argv);
 }

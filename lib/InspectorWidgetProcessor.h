@@ -107,6 +107,11 @@ class InspectorWidgetProcessor{
 
     std::string getAccessibilityAnnotation(std::string name);
     
+    /// getAccessibilityUnderMouse
+    /// time in sec
+    /// x and y are ratios: pixel dimensions divided by video sizes
+    std::vector<float> getAccessibilityUnderMouse(float time, float x, float y);
+
     std::vector<std::string> getTemplateList(){return template_list;}
 
     bool init( int argc, char** argv );
@@ -192,8 +197,8 @@ class InspectorWidgetProcessor{
     int frame;
     int csv_frame;
 
-    int video_x;
-    int video_y;
+    int video_w;
+    int video_h;
     int video_frames;
 
     int current_frame;

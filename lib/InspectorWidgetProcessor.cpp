@@ -432,8 +432,8 @@ void InspectorWidgetProcessor::clear(){
     videostem = "";
     frame = 0;
     csv_frame = 0;
-    video_x = 0;
-    video_y = 0;
+    video_w = 0;
+    video_h = 0;
     video_frames = 0;
     current_frame = 0;
     start_h = 0;
@@ -1430,8 +1430,8 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
         msg << "file " << videopath << " not found or could not be opened";
         return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
     }
-    int video_w = (int)(cap.get(CAP_PROP_FRAME_WIDTH));
-    int video_h = (int)(cap.get(CAP_PROP_FRAME_HEIGHT));
+    this->video_w = (int)(cap.get(CAP_PROP_FRAME_WIDTH));
+    this->video_h = (int)(cap.get(CAP_PROP_FRAME_HEIGHT));
     this->fps = cap.get(CAP_PROP_FPS);
     this->video_frames = (int)(cap.get(CAP_PROP_FRAME_COUNT));
     if(video_w == 0 || video_h == 0){
@@ -1451,7 +1451,8 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
         return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
     }
 
-    this->end_clock = this->start_clock + 1000000000*(this->video_frames/this->fps);
+    this->end_clock = this->ts_clock[this->ts_clock.size()-1];
+    //this->end_clock = this->start_clock + 1000000000*(float(this->video_frames)/float(this->fps));
 
     int ts_time_size = this->ts_time.size();
     int ts_clock_size = this->ts_clock.size();
@@ -3344,10 +3345,10 @@ bool InspectorWidgetProcessor::applyFilterings(){
                         if(word.size()>0 && spacey.size()>0){
                             wordout = (daily_sec_from_now - daily_sec_from_start)*fps;
                             //                        overlay(*w_o, wordin,wordout,
-                            //                                _x/(float)video_x,
-                            //                                _y/(float)video_y,
-                            //                                20/(float)video_x,
-                            //                                20/(float)video_y,
+                            //                                _x/(float)video_w,
+                            //                                _y/(float)video_h,
+                            //                                20/(float)video_w,
+                            //                                20/(float)video_h,
                             //                                word
                             //                                );
                             segment(*w_s, wordin,wordout, word);
@@ -3617,10 +3618,10 @@ bool InspectorWidgetProcessor::parseHookEvents(PCP::CsvConfig* cv_csv){
                         if(word.size()>0 && spacey.size()>0){
                             wordout = (daily_sec_from_now - daily_sec_from_start)*fps;
                             //                        overlay(*w_o, wordin,wordout,
-                            //                                _x/(float)video_x,
-                            //                                _y/(float)video_y,
-                            //                                20/(float)video_x,
-                            //                                20/(float)video_y,
+                            //                                _x/(float)video_w,
+                            //                                _y/(float)video_h,
+                            //                                20/(float)video_w,
+                            //                                20/(float)video_h,
                             //                                word
                             //                                );
 
@@ -3791,7 +3792,7 @@ float InspectorWidgetProcessor::getElapsedSeconds(float timestamp){
 }
 
 std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string name){
-    if(name != "focus_application" && name != "focus_window" && name != "pointed_widget"){
+    if(name != "focus_application" && name != "focus_window" && name != "pointed_widget" && name != "workspace_snapshot"){
         this->setStatusAndReturn("accessibility", "Wrong accessibility annotation name", "");
         return "";
     }
@@ -3802,7 +3803,7 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
 
     std::ifstream iss( axFile );
 
-    iss.exceptions(std::ios::eofbit | std::ios::badbit | std::ios::failbit);
+    //iss.exceptions(std::ios::eofbit | std::ios::badbit | std::ios::failbit);
 
     // Windows has newline translation for text-mode files, so reading from this stream reaches eof and sets fail|eof bits.
     // This test does not cause stream to throw an exception on Linux - I have no idea how to get read() to fail except
@@ -3856,6 +3857,9 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
     }
     else if(name == "pointed_widget"){
         jsonSuffix = "AXPointedWidget";
+    }
+    else if(name == "workspace_snapshot"){
+        jsonSuffix = "AXWorkspaceSnapshot";
     }
 
     StringBuffer ax_s;
@@ -3927,11 +3931,28 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
                         pugi::xml_node t = tpath.node();
                         //std::cout << " -> " << t.name() << std::endl;
                         _name = std::string(t.name()) + ": " + t.attribute("AXTitle").as_string();
-                     }
+                    }
                 }
                 catch(...){
                     std::cout << "Bad xpath" << std::endl;
                 }
+                event(*ax_w, _event_t*this->fps, this->fps, _name );
+            }
+        }
+        eventfooter(*ax_w, jsonSuffix,this->video_frames, this->fps);
+    }
+    else if(name == "workspace_snapshot"){
+        std::string _name("AXWorkspaceSnapshot");
+        for (pugi::xml_node n: root.children("application"))
+        {
+            uint64_t _clock = n.attribute("clock").as_llong();
+            //std::cout << "application " << n.attribute("name").as_string();
+            if(_clock > this->end_clock){
+                break;
+            }
+            if(_clock > this->start_clock && _clock < this->end_clock){
+                double _event_t = double(_clock - this->start_clock )/1000000000.0;
+                //std::cout << "application";
                 event(*ax_w, _event_t*this->fps, this->fps, _name );
             }
         }
@@ -3948,6 +3969,232 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
     }
 
     return ax_s.GetString();
+}
+
+std::vector<float> InspectorWidgetProcessor::getAccessibilityUnderMouse(float _time, float x, float y){
+
+    std::vector<float> rect(4,0.0);
+
+    uint64_t time = this->start_clock + _time*1000000000;
+
+    pugi::xml_document doc;
+
+    std::string axFile = datapath + videostem + ".xml";
+
+    std::ifstream iss( axFile );
+
+    //iss.exceptions(std::ios::eofbit | std::ios::badbit | std::ios::failbit);
+
+    // Windows has newline translation for text-mode files, so reading from this stream reaches eof and sets fail|eof bits.
+    // This test does not cause stream to throw an exception on Linux - I have no idea how to get read() to fail except
+    // newline translation.
+    pugi::xml_parse_result result;
+
+    try
+    {
+        result = doc.load(iss);
+        //std::cout << "Stream read: " << iss.good() << std::endl; // if the exception was not thrown, stream reading should succeed without errors
+    }
+    catch (const std::ios_base::failure&)
+    {
+        //!doc.first_child();
+        std::stringstream msg;
+        msg << "Could not parse accessibility XML file "<< axFile << std::endl;
+        this->setStatusAndReturn("accessibility", msg.str(), "");
+        return rect;
+    }
+
+    if(result.status != pugi::status_ok){
+        std::stringstream msg;
+        msg << "Could not properly load XML file "<< axFile << std::endl;
+        this->setStatusAndReturn("accessibility", msg.str(), "");
+        return rect;
+    }
+
+    pugi::xml_node fc = doc.first_child();
+    if(fc.empty()){
+        std::stringstream msg;
+        msg << "XML file "<< axFile << " is empty, aborting." << std::endl;
+        this->setStatusAndReturn("accessibility", msg.str(), "");
+        return rect;
+    }
+
+    pugi::xml_node root = doc.child("root");
+    if(root.empty()){
+        std::stringstream msg;
+        msg << "XML document doesn't contain a root element" << std::endl;
+        this->setStatusAndReturn("accessibility", msg.str(), "");
+        return rect;
+    }
+
+    /// Find the closest node before time
+    pugi::xml_node closest_node;
+    pugi::xml_node _prev_node;
+    uint64_t _prev_clock = this->start_clock;
+    //for (pugi::xml_node n = root.last_child(); !n.empty(); n = n.previous_sibling())
+    for (pugi::xml_node n: root.children())
+    {
+        uint64_t _clock = n.attribute("clock").as_llong();
+        //std::cout  << "prev=" << _prev_clock   << " time=" << time  << " next=" << _clock << " start="<< this->start_clock << " end="<< this->end_clock << " name=" << n.name() << std::endl;
+        if(_clock > this->start_clock && _clock < this->end_clock && _prev_clock < time && time < _clock){
+            //std::cout << "here" << std::endl;
+            closest_node = n;
+            break;
+        }
+        _prev_clock = _clock;
+        _prev_node = n;
+    }
+
+    if(closest_node.empty()){
+        std::stringstream msg;
+        msg << "Could not match the closest XML element before the desired time" << std::endl;
+        this->setStatusAndReturn("accessibility", msg.str(), "");
+        return rect;
+    }
+
+    /// Find the closest preceeding windowEvent node before the closest node before time
+    pugi::xml_node closest_window_node;
+    for (pugi::xml_node n = closest_node; !n.empty(); n = n.previous_sibling()){
+        //std::cout << "name=" << n.name() << std::endl;
+        if(std::string(n.name()) == "windowEvent"){
+            closest_window_node = n;
+            break;
+        }
+    }
+
+    if(closest_window_node.empty()){
+        std::stringstream msg;
+        msg << "Could not match the closest windowEvent XML element before the desired time" << std::endl;
+        this->setStatusAndReturn("accessibility", msg.str(), "");
+        return rect;
+    }
+
+    /// List all windows that contain x and y
+    for (pugi::xml_node n: closest_window_node.child("allWindows").children("window")){
+        float wx = n.attribute("x").as_float();
+        float wy = n.attribute("y").as_float();
+        float ww = n.attribute("w").as_float();
+        float wh = n.attribute("h").as_float();
+        float wl = wx/float(this->video_w);
+        float wr = (wx+ww)/float(this->video_w);
+        float wt = wy/float(this->video_h);
+        float wb = (wy+wh)/float(this->video_h);
+
+//        std::cout << "@ " << closest_window_node.attribute("clock").as_llong();
+//        std::cout << " window " << n.attribute("app").as_string() << ":" << n.attribute("title").as_string() ;
+//        std::cout << " wl=" << wl << " wr=" << wr << " wt=" << wt << " wb=" << wb << " ";
+//        std::cout << " x=" << x << " y=" << y;
+
+        if( wl < x && x < wr && wt < y && y < wb){
+            /// For each window that contains x and y, find the closest preceeding application node, parse to find the appropriate widget
+//            std::cout << " matches ";
+
+            /// Use window dimensions
+            rect[0] = wl;
+            rect[1] = wt;
+            rect[2] = wr-wl;
+            rect[3] = wb-wt;
+            //return rect;
+
+            /// Find the closest preceeding application node
+            for (pugi::xml_node t = closest_node; !t.empty(); t = t.previous_sibling()){
+                if(std::string(t.name()) == "application"){
+                    std::string query = std::string("./AXApplication/AXWindow[@AXTitle='") + n.attribute("title").as_string() + "']";
+                    pugi::xpath_node tpath = t.select_single_node(query.c_str());
+
+                    if (tpath)
+                    {
+                        pugi::xml_node w = tpath.node();
+//                        std::cout << std::endl;
+//                        std::cout << " @ " << t.attribute("clock").as_llong();
+//                        std::cout << " name " << w.name();// << std::endl;
+//                        std::cout << " AXTitle " << w.attribute("AXTitle").as_string() << std::endl;
+
+                        /// Parse all window children to find a more precise target, depth first
+                        std::map<float, std::vector<float> > _rects;
+                        std::string _tab(" ");
+                        pugi::xml_node _w = w.first_child();
+                        pugi::xml_node _nfc;
+                        while( !_w.empty() ){
+                            bool matching_widget = false;
+                            pugi::xml_node c = _w;
+                            /// Make sure to parse all first-order children of the window
+                            if(c.parent() == w){
+                                _nfc = c.next_sibling();
+//                                std::cout << " (nfc=" << _nfc.name() << ") ";
+                            }
+                            std::string _wf = c.attribute("AXFrame").as_string();
+                            std::vector<std::string> _wps = splitconstraint(_wf,' ');
+                            float _wx = 0.0;
+                            float _wy = 0.0;
+                            float _ww = 0.0;
+                            float _wh = 0.0;
+//                            std::cout << _tab;
+//                            std::cout << " child " << c.name();
+//                            std::cout << " AXTitle " << c.attribute("AXFrame").as_string();
+//                            std::cout << " AXFrame " << _wf;
+                            for(std::vector<std::string>::iterator _wp = _wps.begin(); _wp!=_wps.end();_wp++){
+                                std::string _wn = _wp->substr(0,1);
+                                std::string _wv = _wp->substr(2,_wp->length()-1);
+                                if(_wn == "x"){
+                                    _wx = atoi(_wv.c_str());
+                                }
+                                else if(_wn == "y"){
+                                    _wy = atoi(_wv.c_str());
+                                }
+                                else if(_wn == "w"){
+                                    _ww = atoi(_wv.c_str());
+                                }
+                                else if(_wn == "h"){
+                                    _wh = atoi(_wv.c_str());
+                                }
+                            }
+                            float _wl = _wx/float(this->video_w);
+                            float _wr = (_wx+_ww)/float(this->video_w);
+                            float _wt = _wy/float(this->video_h);
+                            float _wb = (_wy+_wh)/float(this->video_h);
+//                            std::cout << " wl=" << _wl << " wr=" << _wr << " wt=" << _wt << " wb=" << _wb << " ";
+//                            std::cout << " x=" << x << " y=" << y;
+
+                            if( _wl < x && x < _wr && _wt < y && y < _wb){
+//                                std::cout << " MATCHES ";
+                                std::vector<float> _rect(4,0.0);
+                                _rect[0] = _wl;
+                                _rect[1] = _wt;
+                                _rect[2] = _wr-_wl;
+                                _rect[3] = _wb-_wt;
+
+                                /// Map all rect candidates by area
+                                _rects[ (_wr-_wl)*(_wb-_wt) ] = _rect;
+//                                std::cout << std::endl;
+                                _w = _w.first_child();
+                                _tab += " ";
+                                matching_widget = true;
+                            }
+                            else{
+                                _w = _w.next_sibling();
+                            }
+                            if(_w.empty()){
+                                _w = _nfc;
+                                _tab = " ";
+                            }
+
+//                            std::cout << std::endl;
+                        }
+                        /// Choose the rect candidate with minimal area (if any)
+                        if(_rects.size()>0){
+                            rect = _rects.begin()->second;
+                        }
+//                        std::cout << std::endl;
+                        return rect;
+                    }
+                }
+            }
+            break;
+        }
+//        std::cout << std::endl;
+    }
+    return rect;
 }
 
 bool InspectorWidgetProcessor::parseComputerVisionEvents(PCP::CsvConfig* cv_csv){
@@ -4088,10 +4335,10 @@ bool InspectorWidgetProcessor::parseComputerVisionEvents(PCP::CsvConfig* cv_csv)
                         if(val[i] > _threshold){
                             segment(*(w_s[i]), in[i], _in, this->fps, label[i]);
                             overlay(*(w_o[i]), in[i], _in, this->fps,
-                                    (float)_x[i]/(float)video_x+0.5*(float)rx[i]/(float)video_x,
-                                    (float)_y[i]/(float)video_y+0.5*(float)ry[i]/(float)video_y,
-                                    0.5*(float)rx[i]/(float)video_x,
-                                    0.5*(float)ry[i]/(float)video_y,
+                                    (float)_x[i]/(float)video_w+0.5*(float)rx[i]/(float)video_w,
+                                    (float)_y[i]/(float)video_h+0.5*(float)ry[i]/(float)video_h,
+                                    0.5*(float)rx[i]/(float)video_w,
+                                    0.5*(float)ry[i]/(float)video_h,
                                     label[i]
                                     );
                         }
@@ -4107,8 +4354,8 @@ bool InspectorWidgetProcessor::parseComputerVisionEvents(PCP::CsvConfig* cv_csv)
                         if(num[i]!=" " && !num[i].empty()){
                             segment(*(w_s[i]), in[i], _in, this->fps, num[i]);
                             overlay(*(w_o[i]), in[i], _in, this->fps,
-                                    (float)_x[i]/(float)video_x,
-                                    (float)_y[i]/(float)video_y,
+                                    (float)_x[i]/(float)video_w,
+                                    (float)_y[i]/(float)video_h,
                                     0.05,
                                     0.05,
                                     num[i]
@@ -4126,8 +4373,8 @@ bool InspectorWidgetProcessor::parseComputerVisionEvents(PCP::CsvConfig* cv_csv)
                         if(txt[i]!=" " && !txt[i].empty() ){
                             segment(*(w_s[i]), in[i], _in, this->fps, txt[i]);
                             overlay(*(w_o[i]), in[i], _in, this->fps,
-                                    (float)_x[i]/(float)video_x,
-                                    (float)_y[i]/(float)video_y,
+                                    (float)_x[i]/(float)video_w,
+                                    (float)_y[i]/(float)video_h,
                                     0.05,
                                     0.05,
                                     txt[i]
@@ -4186,18 +4433,18 @@ bool InspectorWidgetProcessor::parseComputerVisionEvents(PCP::CsvConfig* cv_csv)
         if(label_type[i] == "val" && val[i] > _threshold){
             segment(*(w_s[i]), in[i], _in, this->fps, label[i]);
             overlay(*(w_o[i]), in[i], _in, this->fps,
-                    (float)_x[i]/(float)video_x+0.5*(float)rx[i]/(float)video_x,
-                    (float)_y[i]/(float)video_y+0.5*(float)ry[i]/(float)video_y,
-                    0.5*(float)rx[i]/(float)video_x,
-                    0.5*(float)ry[i]/(float)video_y,
+                    (float)_x[i]/(float)video_w+0.5*(float)rx[i]/(float)video_w,
+                    (float)_y[i]/(float)video_h+0.5*(float)ry[i]/(float)video_h,
+                    0.5*(float)rx[i]/(float)video_w,
+                    0.5*(float)ry[i]/(float)video_h,
                     label[i]
                     );
         }
         else if(label_type[i] == "num" && num[i]!=" " && !num[i].empty() ){
             segment(*(w_s[i]), in[i], _in, this->fps, num[i]);
             overlay(*(w_o[i]), in[i], _in, this->fps,
-                    (float)_x[i]/(float)video_x,
-                    (float)_y[i]/(float)video_y,
+                    (float)_x[i]/(float)video_w,
+                    (float)_y[i]/(float)video_h,
                     0.05,
                     0.05,
                     num[i]
@@ -4206,8 +4453,8 @@ bool InspectorWidgetProcessor::parseComputerVisionEvents(PCP::CsvConfig* cv_csv)
         else if(label_type[i] == "txt" && txt[i]!=" "  && !txt[i].empty()){
             segment(*(w_s[i]), in[i], _in, this->fps, txt[i]);
             overlay(*(w_o[i]), in[i], _in, this->fps,
-                    (float)_x[i]/(float)video_x,
-                    (float)_y[i]/(float)video_y,
+                    (float)_x[i]/(float)video_w,
+                    (float)_y[i]/(float)video_h,
                     0.05,
                     0.05,
                     txt[i]
