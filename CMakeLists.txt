@@ -34,6 +34,7 @@ endif()
 
 option(BUILD_SHARED_LIBS "Build InspectorWidgetProcessor libraries as shared" ON)
 option(USE_DEBUG "Use Debug" ON)
+option(BUILD_CLI "Build InspectorWidgetProcessor CLI " OFF)
 option(BUILD_TESTS "Build InspectorWidgetProcessor tests " OFF)
 
 if(USE_DEBUG)
@@ -203,8 +204,10 @@ add_subdirectory(lib)
 # INTERNAL LIBRARIES #
 ######################
 
+if(BUILD_CLI)
 include_directories(cli)
 add_subdirectory(cli)
+endif()
 
 ######################
 #    NODEJS ADDON    #
