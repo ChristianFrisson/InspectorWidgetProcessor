@@ -62,9 +62,9 @@ std::string getStemName(std::string file_path);
 std::string getExtension(std::string file_path);
 
 void MatchingMethod( cv::Mat& srca,  // The reference image
-                    cv::Mat& srcb,  // The template image
-                    cv::Mat& dst,   // Template matching result
-                    int match_method);
+                     cv::Mat& srcb,  // The template image
+                     cv::Mat& dst,   // Template matching result
+                     int match_method);
 
 void fastMatchTemplate(cv::Mat& srca,  // The reference image
                        cv::Mat& srcb,  // The template image
@@ -89,7 +89,7 @@ struct InspectorWidgetTime {
 class InspectorWidgetProcessor{
     friend class InspectorWidgetProcessorCommandParser::operators;
 
-    public:
+public:
     InspectorWidgetProcessor();
     ~InspectorWidgetProcessor();
     //std::map<std::string, std::vector<float> > parseCSV(std::string file);
@@ -101,7 +101,7 @@ class InspectorWidgetProcessor{
     float getStatusProgress();
     bool setStatusAndReturn(std::string phase, std::string error_message = "", std::string success_message = "" );
 
-	float getElapsedSeconds(float timestamp);
+    float getElapsedSeconds(float timestamp);
 
     std::string getTemplateAnnotation(std::string name);
 
@@ -118,12 +118,13 @@ class InspectorWidgetProcessor{
     bool init( std::vector<std::string> );
     void process();
     void abort();
-    void clear();    
+    void clear();
 
     bool parseComputerVisionEvents(PCP::CsvConfig* cv_csv);
     bool parseClockTimestampsFile(std::string _path);
-    bool parseFirstMinuteFrameFile(PCP::CsvConfig* cv_csv);
-    bool parseHookEvents(PCP::CsvConfig* cv_csv);
+    bool parseFirstMinuteFrameFile(PCP::CsvConfig* fmf_csv);
+    bool checkHookEvents(std::ifstream& hook_txt);
+    bool parseHookEvents(std::ifstream& hook_txt, bool using_clocktime);
     bool parseFilterings( std::vector<std::string>& filtering_list);
     bool applyFilterings();
 
@@ -161,7 +162,7 @@ class InspectorWidgetProcessor{
     }
 
 
-    protected:
+protected:
     std::string status_success;
     std::string status_error;
     std::string status_phase;
@@ -189,6 +190,7 @@ class InspectorWidgetProcessor{
     std::map<std::string,std::ofstream> csvfile;
 
     std::string hook_path;
+    int hook_header_size;
 
     std::string datapath;
     std::string videostem;
@@ -224,6 +226,15 @@ class InspectorWidgetProcessor{
     std::map<int, uint64> ts_time;
     std::map<int, uint64> ts_clock;
 
+    std::vector<std::string> supported_extraction_tests;
+    std::vector<std::string> supported_extraction_actions;
+    std::vector<std::string> supported_conversion_tests;
+    std::vector<std::string> supported_conversion_actions;
+    std::vector<std::string> supported_accessibility_tests;
+    std::vector<std::string> supported_accessibility_actions;
+    std::vector<std::string> supported_input_hook_tests;
+    std::vector<std::string> supported_input_hook_actions;
+
     std::list<std::string> template_matching_logged_dep_list;
     std::map<std::string,std::vector<std::string> > template_matching_logged_dep_map;
 
@@ -252,12 +263,17 @@ class InspectorWidgetProcessor{
 
     std::map<std::string,std::vector<int> > inrect_map;
 
-    std::vector<std::string> filtering_list;
     std::vector<std::string> filters;
     std::map<std::string,std::string> filtering_test;
     std::map<std::string,std::vector<std::string> > filtering_deps;
     std::map<std::string,std::string> filtering_action;
     std::map<std::string,std::vector<std::string> > filtering_variables;
+
+    std::vector<std::string> inputhooks;
+    std::map<std::string,std::string> inputhook_test;
+    std::map<std::string,std::vector<std::string> > inputhook_deps;
+    std::map<std::string,std::string> inputhook_action;
+    std::map<std::string,std::vector<std::string> > inputhook_variables;
 
     int match_method;
     int max_Trackbar;

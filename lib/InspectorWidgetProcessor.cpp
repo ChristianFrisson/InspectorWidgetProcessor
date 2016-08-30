@@ -31,8 +31,6 @@ bool canformword(int keycodeint){
     case VC_0: //0x000B
 
     case VC_MINUS: //0x000C	// '-'
-    case VC_EQUALS: //0x000D	// '='
-    case VC_BACKSPACE: //0x000E
 
     case VC_A: //0x001E
     case VC_B: //0x0030
@@ -61,32 +59,7 @@ bool canformword(int keycodeint){
     case VC_Y: //0x0015
     case VC_Z: //0x002C
 
-    case VC_OPEN_BRACKET: //0x001A	// '['
-    case VC_CLOSE_BRACKET: //0x001B	// ']'
-        //case VC_BACK_SLASH: //0x002B	// '\'
-
-    case VC_SEMICOLON: //0x0027	// ';'
-    case VC_QUOTE: //0x0028
-
-    case VC_COMMA: //0x0033	// ','
-    case VC_PERIOD: //0x0034	// '.'
-    case VC_SLASH: //0x0035	// '/'
-
-    case VC_SPACE: //0x0039
-        // End Alphanumeric Zone
-
         _canformword = true;
-        break;
-
-    case VC_SHIFT_L: //0x002A
-    case VC_SHIFT_R: //0x0036
-    case VC_CONTROL_L: //0x001D
-    case VC_CONTROL_R: //0x0E1D
-    case VC_ALT_L: //0x0038	// Option or Alt Key
-    case VC_ALT_R: //0x0E38	// Option or Alt Key
-    case VC_META_L: //0x0E5B	// Windows or Command Key
-    case VC_META_R: //0x0E5C	// Windows or Command Key
-        _canformword = false;
         break;
 
     default:
@@ -94,6 +67,24 @@ bool canformword(int keycodeint){
         break;
 
     }
+    return _canformword;
+}
+
+bool canformword(std::string keychar){
+    bool _canformword = false;
+    if(keychar.size() != 1){
+        return _canformword;
+    }
+    int _keychar = (char)keychar[0];
+    if( _keychar == 45 // '-'
+            || (_keychar >= 48 && _keychar <= 57) // 0-9
+            || (_keychar >= 64 && _keychar <= 90) // @ A-Z
+            || (_keychar >= 97 && _keychar <= 122) // @ a-z
+            )
+    {
+        _canformword = true;
+    }
+
     return _canformword;
 }
 
@@ -420,6 +411,45 @@ InspectorWidgetProcessor::InspectorWidgetProcessor(){
     text_window = "Detected text";
 
     _threshold = 0.99;
+
+    supported_extraction_tests.push_back("if");
+    supported_extraction_tests.push_back("between");
+    supported_extraction_tests.push_back("below");
+    supported_extraction_tests.push_back("rightof");
+    supported_extraction_tests.push_back("inrect");
+
+    supported_extraction_actions.push_back("matchTemplate");
+    supported_extraction_actions.push_back("detectText");
+    supported_extraction_actions.push_back("detectNumber");
+    supported_extraction_actions.push_back("detectTime");
+    supported_extraction_actions.push_back("template");
+
+    supported_conversion_tests.push_back("during");
+    supported_conversion_tests.push_back(""); // make test statements optional
+
+    supported_conversion_actions.push_back("matchFirstValueOf");
+    supported_conversion_actions.push_back("triggerBySegmentsOf");
+    supported_conversion_actions.push_back("eval");
+    supported_conversion_actions.push_back("nestByLastVariable");
+    //supported_conversion_actions.push_back("append");
+    //supported_conversion_actions.push_back("ifThenElse");
+    //supported_conversion_actions.push_back("ifThen");
+
+    supported_accessibility_tests.push_back("during");
+    supported_accessibility_tests.push_back(""); // make test statements optional
+
+    //supported_accessibility_actions.push_back("getFocusApplication");
+    //supported_accessibility_actions.push_back("getFocusWindow");
+    //supported_accessibility_actions.push_back("getPointedWidget");
+
+    supported_input_hook_tests.push_back("during");
+    supported_input_hook_tests.push_back(""); // make test statements optional
+
+    supported_input_hook_actions.push_back("getWords");
+    //supported_input_hook_actions.push_back("getPointerClicks");
+    //supported_input_hook_actions.push_back("getKeysPressed");
+    //supported_input_hook_actions.push_back("getModifierCombosPressed");
+    //supported_input_hook_actions.push_back("matchKey");
 }
 
 void InspectorWidgetProcessor::clear(){
@@ -496,12 +526,17 @@ void InspectorWidgetProcessor::clear(){
 
     inrect_map.clear();
 
-    filtering_list.clear();
     filters.clear();
     filtering_test.clear();
     filtering_deps.clear();
     filtering_action.clear();
     filtering_variables.clear();
+
+    inputhooks.clear();
+    inputhook_test.clear();
+    inputhook_deps.clear();
+    inputhook_action.clear();
+    inputhook_variables.clear();
 }
 
 InspectorWidgetProcessor::~InspectorWidgetProcessor(){
@@ -1318,12 +1353,12 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
     status_progress = 0;
     active = true;
 
+    /// Init lexical parser
     pegtl::analyze< InspectorWidgetProcessorCommandParser::grammar >();
-
     parser_operators = new InspectorWidgetProcessorCommandParser::operators( std::bind( &InspectorWidgetProcessor::s2b, this, std::placeholders::_1), std::bind( &InspectorWidgetProcessor::b2s, this, std::placeholders::_1) );
 
-
-    /*std::string*/ datapath = argv[0];
+    /// Setup default file path/stem:
+    datapath = argv[0];
 #ifdef WIN32
     std::string slash("\\");
 #else
@@ -1333,64 +1368,18 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
     if(slashpos!=datapath.size()-1)
         datapath += slash;
 
-    /*std::string*/ videostem = getStemName(argv[1]);
+    videostem = getStemName(argv[1]);
     std::size_t underpos = videostem.find_first_of("_");
     if(underpos!=std::string::npos)
         videostem = videostem.substr(0,underpos);
 
-    /// Check if date and time are encoded in the filename;
+    std::string videopath = datapath + videostem + ".mp4";
+    std::cout << "datapath " << datapath << std::endl;
+    std::cout << "videostem " << videostem << std::endl;
+    std::cout << "videopath " << videopath << std::endl;
 
-    //    size_t timestempos = videostem.find_last_of("-");
-    //    std::string timestem;
-    //    if(timestempos!=std::string::npos){
-    //        timestem = videostem.substr(timestempos+1);
-    //    }
-    //    else{
-    //        std::stringstream msg;
-    //        msg << "Couldn't retrieve a time stamp matching '-hhmm' at the end of video filename " << videostem << ", aborting";
-    //        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
-    //    }
-    //    //std::cout << "Timestamp encoded in file name: '" << timestem << "'" << std::endl;
-
-    //    if(timestem.size() == 4){
-    //        start_t.h = atoi(timestem.substr(0,1).c_str())*10 + atoi(timestem.substr(1,1).c_str());
-    //        start_t.m = atoi(timestem.substr(2,1).c_str())*10 + atoi(timestem.substr(3,1).c_str());
-    //    }
-    //    else{
-    //        std::stringstream msg;
-    //        msg << "Couldn't retrieve a time stamp matching '-hhmm' at the end of video filename " << videostem << ", aborting";
-    //        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
-    //    }
-
-    //    std::cout << "Timestamp encoded in file name: '" << start_t.h << ":"  << start_t.m << "'" << std::endl;
-
-    //    size_t datestempos = videostem.find_last_of("-",timestempos-1);
-    //    std::string datestem;
-    //    if(datestempos!=std::string::npos){
-    //        datestem = videostem.substr(datestempos+1,timestempos-datestempos-1);
-    //    }
-    //    else{
-    //        std::stringstream msg;
-    //        msg << "Couldn't retrieve a date stamp matching '-yyddmm' at the end of video filename before the time stamp" << videostem << ", aborting";
-    //        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
-    //    }
-    //    //std::cout << "Timestamp encoded in file name: '" << datestem << "'" << std::endl;
-
-    //    if(datestem.size() == 6){
-    //        start_d.y = 2000 + atoi(datestem.substr(0,1).c_str())*10 + atoi(datestem.substr(1,1).c_str());
-    //        start_d.m = atoi(datestem.substr(2,1).c_str())*10 + atoi(datestem.substr(3,1).c_str());
-    //        start_d.d = atoi(datestem.substr(4,1).c_str())*10 + atoi(datestem.substr(5,1).c_str());
-    //    }
-    //    else{
-    //        std::stringstream msg;
-    //        msg << "Couldn't retrieve a date stamp matching '-yyddmm' at the end of video filename before the time stamp" << videostem << ", aborting";
-    //        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
-    //    }
-
-    //    std::cout << "Timestamp encoded in file name: '" << start_d.y << "/" << start_d.m << "/"  << start_d.d << "'" << std::endl;
-
+    /// Check if date and time are encoded in the filename:
     std::string _timestamps = videostem;
-
     /// split the video filename in a vector by delimiter '-'
     vector<string> _splitstamps = splitconstraint (_timestamps, '-');
     if(_splitstamps.size()>=6 & _splitstamps[_splitstamps.size()-6].size() == 4 ){
@@ -1408,21 +1397,17 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                 + atoi(_splitstamps[_splitstamps.size()-2].substr(1,1).c_str());
         start_t.s = atoi(_splitstamps[_splitstamps.size()-1].substr(0,1).c_str())*10
                 + atoi(_splitstamps[_splitstamps.size()-1].substr(1,1).c_str());
-
     }
-
     std::cout << "Timestamp encoded in file name: '" << start_d.y << "/" << start_d.m << "/"  << start_d.d << "' '";
     std::cout << start_t.h << ":"  << start_t.m << ":"  << start_t.s << "'" << std::endl;
+    if(start_d.y == -1 || start_d.m == -1 || start_d.d == -1 || start_t.h == -1 || start_t.m == -1 || start_t.s == -1 )
+    {
+        std::stringstream msg;
+        msg << "Date and time could not be initialized from filename " << videopath << ", aborting";
+        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+    }
 
-    ///
-
-    std::string videopath = datapath + videostem + ".mp4";
-
-    std::cout << "datapath " << datapath << std::endl;
-    std::cout << "videostem " << videostem << std::endl;
-    std::cout << "videopath " << videopath << std::endl;
-
-    /// Load image and template
+    /// Load video and template images
     cap.open(videopath); // open a video file
     if(!cap.isOpened())  // check if succeeded
     {
@@ -1444,16 +1429,13 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
     //std::string tspath = datapath + videostem + "/tsv/" + videostem + ".tsv";
     std::string tspath = datapath + videostem + ".tsv";
     bool ts_success = this->parseClockTimestampsFile(tspath);
-
     if(!ts_success){
         std::stringstream msg;
         msg << "Error while parsing clock timestamps file " << tspath << " , aborting";
         return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
     }
-
     this->end_clock = this->ts_clock[this->ts_clock.size()-1];
     //this->end_clock = this->start_clock + 1000000000*(float(this->video_frames)/float(this->fps));
-
     int ts_time_size = this->ts_time.size();
     int ts_clock_size = this->ts_clock.size();
     if(this->video_frames - ts_time_size > 1 || this->video_frames - ts_clock_size > 1){
@@ -1463,9 +1445,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
     }
 
     /// Parse remaining arguments
-
-    std::vector<std::string> csv_list,hook_list,constraint_list;
-
+    std::vector<std::string> csv_list,constraint_list;
     for(int a=2; a<argv.size() ;a++){
         std::string _arg = argv[a];
         std::string ext = getExtension(_arg);
@@ -1487,11 +1467,10 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
             /// split each constraint in a vector by delimiters like '\n' (and '}'?)
             vector<string> _splitconstraints = splitconstraint (_constraint, '\n');
             for(vector<string>::iterator _splitconstraint = _splitconstraints.begin(); _splitconstraint != _splitconstraints.end(); _splitconstraint++){
-                std::cout << "constraint: '" << *_splitconstraint << "'"<< std::endl;
+                std::cout << "Found constraint: '" << *_splitconstraint << "'"<< std::endl;
                 if(! _splitconstraint->empty() ){
                     constraint_list.push_back(*_splitconstraint);
                 }
-
             }
             /*std::cout << "constraint:" << _constraint << std::endl;
             constraint_list.push_back(_constraint);*/
@@ -1499,12 +1478,10 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
     }
 
     /// Check for existing csvs
-
     int stop;
     double time;
     int start = getTickCount();
     double frequency = getTickFrequency();
-
 
     //std::map<std::string, std::vector<float> > log;
     //std::vector<int> log_sizes;
@@ -1570,6 +1547,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
             log_y[_l->first] = _l->second;
         }
     }*/
+    bool fmf_success = false;
     for(std::vector<std::string>::iterator _csv = csv_list.begin(); _csv != csv_list.end(); _csv++){
 
         //std::string cv_csvpath = datapath + std::string(argv[1]);
@@ -1599,12 +1577,15 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
             this->parseComputerVisionEvents(cv_csv);
         }
         else if(_cv_headers.size() == 3 && _cv_headers[0] == "h" && _cv_headers[1] == "m" && _cv_headers[2] == "frames"){
-            std::cout << "Parsing csv file " << cv_csvpath << " to get first minute frame count" << std::endl;
-            bool success = this->parseFirstMinuteFrameFile(cv_csv);
-            if(!success){
-                std::stringstream msg;
-                msg << "Csv file " << cv_csvpath << " didn't contain first minute frame count";
-                return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+            /// If we couldn't successfully parse a timestamps file, let's try to parse a first minute file
+            if(!ts_success){
+                std::cout << "Parsing csv file " << cv_csvpath << " to get first minute frame count" << std::endl;
+                fmf_success = this->parseFirstMinuteFrameFile(cv_csv);
+                if(!fmf_success){
+                    std::stringstream msg;
+                    msg << "Csv file " << cv_csvpath << " didn't contain first minute frame count";
+                    return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+                }
             }
         }
         else{
@@ -1613,7 +1594,6 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
             return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
         }
     }
-
 
     /// Ensure that CSV files have the same length
     /*int log_size = 0;
@@ -1641,72 +1621,31 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                 msg << "Log size mismatch: size of log " << log_name << " = " << log_size << " while of log " << _log->first  << " = " << _log_size << ", aborting ";
                 return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
             }
-
         }
     }
 
-
-
-    /*std::vector<std::string> template_matching_logged_dep_list;
-    std::map<std::string,std::vector<std::string> > template_matching_logged_dep_map;
-
-    std::vector<std::string> template_matching_new_dep_list;
-    std::map<std::string,std::vector<std::string> > template_matching_new_dep_map;
-
-    std::vector<std::string> text_detect_logged_dep_list;
-    std::map<std::string,std::vector<std::string> > text_detect_logged_dep_map;
-
-    std::vector<std::string> text_detect_new_dep_list;
-    std::map<std::string,std::vector<std::string> > text_detect_new_dep_map;
-
-    std::vector<std::string> text_detect_list;*/
-
+    /// Check constraints:
     /*bool*/ parse_full_video = false;
-
-    std::vector<std::string> supported_extraction_tests;
-    supported_extraction_tests.push_back("if");
-    supported_extraction_tests.push_back("between");
-    supported_extraction_tests.push_back("below");
-    supported_extraction_tests.push_back("rightof");
-    supported_extraction_tests.push_back("inrect");
-
-    std::vector<std::string> supported_extraction_actions;
-    supported_extraction_actions.push_back("matchTemplate");
-    supported_extraction_actions.push_back("detectText");
-    supported_extraction_actions.push_back("detectNumber");
-    supported_extraction_actions.push_back("detectTime");
-    supported_extraction_actions.push_back("template");
-
-    std::vector<std::string> supported_conversion_tests;
-    supported_conversion_tests.push_back("during");
-
-    std::vector<std::string> supported_conversion_actions;
-    supported_conversion_actions.push_back("matchFirstValueOf");
-    supported_conversion_actions.push_back("triggerBySegmentsOf");
-    //supported_conversion_actions.push_back("append");
-    //supported_conversion_actions.push_back("ifThenElse");
-    //supported_conversion_actions.push_back("ifThen");
-    supported_conversion_actions.push_back("eval");
-    supported_conversion_actions.push_back("nestByLastVariable");
-
-    std::map<std::string , std::vector<std::string> > text_detect_deps; // name , templates
-    std::map<std::string , std::string > template_dep;
-
+    bool needsHookEvents = false;
+    bool needsAccessibility = false;
     for(std::vector<std::string>::iterator _constraint = constraint_list.begin(); _constraint!= constraint_list.end();_constraint++){
         std::string _c = *_constraint;
 
-        std::cout << "Constraint: " << _c << std::endl;
+        std::cout << "Parsing constraint: '" << _c << "'" << std::endl;
 
         std::string _t,_v;
         std::vector<std::string> _vs;
 
         bool forExtraction = false;
         bool forConversion = false;
+        bool forAccessibility = false;
+        bool forInputHooks = false;
 
-        /// Check if we have a test statement:
+        /// Check if the constraint has a test statement:
         size_t _a_begin_loc = _c.find("{",0);
         if(_a_begin_loc!=std::string::npos){
 
+            /// Check the test statement:
             size_t _t_end_loc = _c.find("(",0);
             if(_t_end_loc==std::string::npos){
                 std::stringstream msg;
@@ -1715,8 +1654,13 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
             }
             _t = _c.substr(0,_t_end_loc);
             _t.erase (std::remove(_t.begin(), _t.end(), ' '), _t.end());
+
+            /// Check if the test is supported:
             bool testSupported = false;
             for(std::vector<std::string>::iterator _statement = supported_extraction_tests.begin(); _statement != supported_extraction_tests.end(); _statement++){
+                testSupported |= ( *_statement == _t);
+            }
+            for(std::vector<std::string>::iterator _statement = supported_conversion_tests.begin(); _statement != supported_conversion_tests.end(); _statement++){
                 testSupported |= ( *_statement == _t);
             }
             if(!testSupported){
@@ -1724,8 +1668,9 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                 msg << "Constraint '" << _c << "' has unsupported test statement '" << _t << "', aborting";
                 return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
             }
-            std::cout << "Test statement: " << _t << std::endl;
+            std::cout << "Constraint '" << _c << "' has a test statement: " << _t << std::endl;
 
+            /// Check the test variable(s):
             size_t _v_end_loc = _c.find(")",_t_end_loc);
             if(_v_end_loc==std::string::npos){
                 std::stringstream msg;
@@ -1745,7 +1690,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                 _vs.push_back(__v);
                 _vs_start_loc = _vs_end_loc+1;
             }
-            std::cout << _vs.size() << " test variable(s): ";
+            std::cout << "Constraint '" << _c << "' has " << _vs.size() << " test variable(s): ";
             for(std::vector<std::string>::iterator __v = _vs.begin(); __v != _vs.end(); __v++)
                 std::cout << *__v << " ";
             std::cout << std::endl;
@@ -1761,6 +1706,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
             _a_begin_loc = 0;
         }
 
+        /// Check if the constraint has a name assigment:
         std::string _n;
         size_t _n_end_loc = _c.find("=",_a_begin_loc);
         if(_n_end_loc!=std::string::npos){
@@ -1770,6 +1716,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
             std::cout << "Constraint '" << _c << "' has a name assigment: " << _n << std::endl;
         }
 
+        /// Check the constraint action statement:
         size_t _a_end_loc = _c.find("(",_a_begin_loc);
         if(_a_end_loc==std::string::npos){
             std::stringstream msg;
@@ -1790,19 +1737,26 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
         //        }
         //        std::cout << "Action statement: " << _a << std::endl;
 
+        /// Check statement type:
         forConversion = (std::find(supported_conversion_actions.begin(),supported_conversion_actions.end(),_a) != supported_conversion_actions.end())
                 && (std::find(supported_conversion_tests.begin(),supported_conversion_tests.end(),_t) != supported_conversion_tests.end()  || _t.empty());
-
         forExtraction = (std::find(supported_extraction_actions.begin(),supported_extraction_actions.end(),_a) != supported_extraction_actions.end())
                 && (std::find(supported_extraction_tests.begin(),supported_extraction_tests.end(),_t) != supported_extraction_tests.end()  || _t.empty());
-
-        if(!forConversion && !forExtraction){
+        forAccessibility = (std::find(supported_accessibility_actions.begin(),supported_accessibility_actions.end(),_a) != supported_accessibility_actions.end())
+                && (std::find(supported_accessibility_tests.begin(),supported_accessibility_tests.end(),_t) != supported_accessibility_tests.end()  || _t.empty());
+        forInputHooks = (std::find(supported_input_hook_actions.begin(),supported_input_hook_actions.end(),_a) != supported_input_hook_actions.end())
+                && (std::find(supported_input_hook_tests.begin(),supported_input_hook_tests.end(),_t) != supported_input_hook_tests.end()  || _t.empty());
+        if(!forConversion && !forExtraction && !forAccessibility && !forInputHooks){
             std::stringstream msg;
             msg << "Constraint '" << _c << "' has unsupported action statement " << _a << ", aborting";
             return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
         }
-        std::cout << "Action statement: " << _a << std::endl;
+        needsHookEvents |= forInputHooks;
+        needsAccessibility |= forAccessibility;
 
+        std::cout << "Constraint '" << _c << "' has an action statement: " << _a << std::endl;
+
+        /// Check action variable(s):
         size_t _av_end_loc = _c.find(")",_a_end_loc);
         if(_av_end_loc==std::string::npos){
             std::stringstream msg;
@@ -1823,18 +1777,12 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
             _avs.push_back(__av);
             _avs_start_loc = _avs_end_loc+1;
         }
-        std::cout << _avs.size() << " action variable(s): ";
+        std::cout << "Constraint '" << _c << "' has " << _avs.size() << " action variable(s): ";
         for(std::vector<std::string>::iterator __av = _avs.begin(); __av != _avs.end(); __av++)
             std::cout << *__av << " ";
         std::cout << std::endl;
 
-
-        //        forConversion = (std::find(supported_conversion_actions.begin(),supported_conversion_actions.end(),_a) != supported_conversion_actions.end())
-        //                && (std::find(supported_conversion_tests.begin(),supported_conversion_tests.end(),_t) != supported_conversion_tests.end());
-
-        //        forExtraction = (std::find(supported_extraction_actions.begin(),supported_extraction_actions.end(),_a) != supported_extraction_actions.end())
-        //                && (std::find(supported_extraction_tests.begin(),supported_extraction_tests.end(),_t) != supported_extraction_tests.end()  || _t.empty());
-
+        /// Process extraction statements:
         if(forExtraction){
 
             if(_t == "inrect"){
@@ -2047,7 +1995,6 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                         _text_detect_dep_list.push_back(*__v);
                     }
 
-
                     for(std::vector<std::string>::iterator __av = _avs.begin(); __av != _avs.end(); __av++){
                         if(_a == "matchTemplate"){
                             template_matching_new_dep_map[*__av] = _template_matching_new_dep_list;
@@ -2073,6 +2020,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                 }
             }
         }
+        /// Process conversion statements:
         else if(forConversion){
             filters.push_back(_n);
             filtering_test[_n] = _t;
@@ -2080,9 +2028,49 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
             filtering_action[_n] = _a;
             filtering_variables[_n] = _avs;
         }
+        /// Process accessibility statements:
+        else if(forAccessibility){
+
+        }
+        /// Process hook input statements:
+        else if(forInputHooks){
+            if(_a == "matchKey" && _avs.size() !=1){
+                std::stringstream msg;
+                msg <<  "Constraint '" << _c << "' with action "<< _a << " should have 1 parameter instead of "<< _avs.size() << ", aborting";
+                return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+            }
+            else if(_a != "matchKey" && _avs.size() !=0){
+                std::stringstream msg;
+                msg <<  "Constraint '" << _c << "' with action "<< _a << " should have no parameter instead of "<< _avs.size() << ", aborting";
+                return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+            }
+            inputhooks.push_back(_n);
+            inputhook_test[_n] = _t;
+            inputhook_deps[_n] = _vs;
+            inputhook_action[_n] = _a;
+            inputhook_variables[_n] = _avs;
+        }
     }
 
+    /// Check for existing hook input file
+    std::ifstream hook_txt;
+    if(needsHookEvents){
+        this->hook_path = datapath + videostem + ".txt";
+        hook_txt.open(hook_path.c_str());
+        if(!hook_txt.is_open()){
+            std::stringstream msg;
+            msg <<  "Couldn't open hook input file " << hook_path;
+            return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+        }
+        bool hook_success = this->checkHookEvents(hook_txt);
+        if(!hook_success){
+            std::stringstream msg;
+            msg << "Error while parsing hook input file " << hook_path << " , aborting";
+            return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+        }
+    }
 
+    /// Load template image whose filename were passed as arguments
     for(std::vector<std::string>::iterator _template = template_list.begin(); _template!= template_list.end();_template++){
         std::string template_name = *_template;
         std::string template_path = datapath + template_name + ".png";
@@ -2104,6 +2092,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
         }*/
     }
 
+    /// Check the processing dependencies of these loaded template images
     for(std::vector<std::string>::iterator _template = template_list.begin(); _template!= template_list.end();_template++){
         std::string _name = *_template;
 
@@ -2119,7 +2108,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
 
     //for(std::vector<std::string>::iterator _n = template_list.begin(); _n != template_list.end(); _n++ ){
 
-    /// One file for the whole export session
+    /// Prepare one CSV file for the whole export session
     {
         std::string filepath = datapath + videostem;
         for(std::vector<std::string>::iterator _template = template_list.begin(); _template!= template_list.end();_template++){
@@ -2138,7 +2127,6 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
         }
         std::cout << "Logging in file '" << filepath << "'" << std::endl;
     }
-
     file << "\"Frame\"";
     //for(std::vector<std::string>::iterator _template = template_list.begin(); _template!= template_list.end();_template++){
     for(std::vector<std::string>::iterator _template = template_list.begin(); _template!= template_list.end();_template++){
@@ -2162,8 +2150,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
     }
     file << std::endl;
 
-    /// One file per extracted variable
-
+    /// Prepare one file per template to extract
     //for(std::vector<std::string>::iterator _template = template_list.begin(); _template!= template_list.end();_template++){
     for(std::vector<std::string>::iterator _template = template_list.begin(); _template!= template_list.end();_template++){
         std::string template_name = *_template;
@@ -2208,6 +2195,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
         csvfile[*_text_detection] << std::endl;
     }
 
+    /// Prepare windows to debug extraction by frame
     if(with_gui){
         /// Create windows
         namedWindow( image_window, WINDOW_AUTOSIZE );
@@ -2233,112 +2221,124 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
     //cv::Mat dst;
     //return true;
 
+    stop = getTickCount();
+    time = (double)(stop-start)/frequency;
+    std::cout << "Time taken to prepare files and parse constraints: " << time << std::endl;
+    stop = start;
+    std::cout << std::flush;
+
+    /// Check if the process needs to be aborted
     if(!active){
         std::stringstream msg;
         msg << "Abort requested for video file " << videostem << "), aborting";
         return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
     }
 
-    /// Process constraints over the video frames
+    /// If a timestamps file has been successfully parsed, accessibility and input hook constraints can be processed before video extraction
+    /// Process hook input constraints
+    bool hi_pre_success = false;
+    if(needsHookEvents){
+        hi_pre_success = this->parseHookEvents(hook_txt,ts_success);
+        if(!hi_pre_success){
+            std::stringstream msg;
+            msg << "Error during hook input processing, aborting";
+            return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+        }
+        stop = getTickCount();
+        time = (double)(stop-start)/frequency;
+        std::cout << "Time taken to process hook input constraints: " << time << std::endl;
+        stop = start;
+        std::cout << std::flush;
+    }
+
+    /// Check if the process needs to be aborted
+    if(!active){
+        std::stringstream msg;
+        msg << "Abort requested for video file " << videostem << "), aborting";
+        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+    }
+
+    /// Process extraction constraints over the video frames
     this->process();
+    stop = getTickCount();
+    time = (double)(stop-start)/frequency;
+    std::cout << "Time taken to process extraction constraints: " << time << std::endl;
+    stop = start;
+    std::cout << std::flush;
 
+    /// Check if the process needs to be aborted
     if(!active){
         std::stringstream msg;
         msg << "Abort requested for video file " << videostem << "), aborting";
         return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
     }
 
-    /// Process filterings
+    /// If no timestamps file has been successfully parsed, accessibility and input hook constraints must be processed after video extraction
+    /// To resynchronize all sources, we determine the amount of video frames from the first minute
+    /// (legacy solution before video frames were timestamped)
+    if(!ts_success){
+        if(first_minute_frames == -1){
+            std::stringstream msg;
+            msg << "Didn't compute first minute frames, or parse any file indicating it, skipping hook input analysis";
+            return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+        }
+        else{
+            //start_t.h = start_h;
+            //start_t.m = start_m;
+            start_t.s = 60.0*(float)(fps*60 - first_minute_frames) / (float)(fps*60);
 
+            end_t.s = start_t.h*3600 + start_t.m*60 + start_t.s + this->video_frames/(float)fps;
+            end_t.h = floor(end_t.s/3600);
+            end_t.m = floor( (end_t.s-3600*end_t.h)/60 );
+            end_t.s -= end_t.h*3600 + end_t.m*60;
+
+            std::cout << "Start " << start_t.h << " " << start_t.m << " " << start_t.s << std::endl;
+            std::cout << "End " << end_t.h << " " << end_t.m << " " << end_t.s << std::endl;
+        }
+        stop = getTickCount();
+        time = (double)(stop-start)/frequency;
+        std::cout << "Time taken to rematch timestamps: " << time << std::endl;
+        stop = start;
+        std::cout << std::flush;
+
+        /// Process hook input constraints
+        if(needsHookEvents && !hi_pre_success){
+            bool hi_post_success = this->parseHookEvents(hook_txt,false);
+            if(!hi_post_success){
+                std::stringstream msg;
+                msg << "Error during hook input processing, aborting";
+                return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+            }
+            stop = getTickCount();
+            time = (double)(stop-start)/frequency;
+            std::cout << "Time taken to process hook input constraints: " << time << std::endl;
+            stop = start;
+            std::cout << std::flush;
+        }
+    }
+
+    /// Check if the process needs to be aborted
+    if(!active){
+        std::stringstream msg;
+        msg << "Abort requested for video file " << videostem << "), aborting";
+        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+    }
+
+    /// Process conversion filterings
     if(filters.empty()){
         std::stringstream msg;
         msg << "done";
         return setStatusAndReturn(/*phase*/"init",/*error*/"", /*success*/msg.str());
     }
-
-    if(first_minute_frames == -1){
-        std::stringstream msg;
-        msg << "Didn't compute first minute frames, or parse any file indicating it, skipping hook file analysis";
-        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
-    }
-    else{
-        //start_t.h = start_h;
-        //start_t.m = start_m;
-        start_t.s = 60.0*(float)(fps*60 - first_minute_frames) / (float)(fps*60);
-
-        end_t.s = start_t.h*3600 + start_t.m*60 + start_t.s + this->video_frames/(float)fps;
-        end_t.h = floor(end_t.s/3600);
-        end_t.m = floor( (end_t.s-3600*end_t.h)/60 );
-        end_t.s -= end_t.h*3600 + end_t.m*60;
-
-        std::cout << "Start " << start_t.h << " " << start_t.m << " " << start_t.s << std::endl;
-        std::cout << "End " << end_t.h << " " << end_t.m << " " << end_t.s << std::endl;
-
-        for(std::vector<std::string>::iterator _hook = hook_list.begin(); _hook != hook_list.end(); _hook++){
-
-            PCP::CsvConfig* hook_csv = 0;
-            //if(argc>3 && ! std::string(argv[2]).empty()){
-
-            //std::string hookpath = datapath + std::string(argv[2]);
-            std::string hookpath = *_hook;
-
-            if(first_minute_frames == -1){
-                std::stringstream msg;
-                msg <<  "First minute frame info necessary to parse hook events file " << hookpath << ", aborting...";
-                return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
-            }
-
-            try{
-                hook_csv = new PCP::CsvConfig(hookpath.c_str(),/*bool has_header_line*/ false);
-            }
-            catch(...){
-                std::stringstream msg;
-                msg <<  "Couldn't open " << hookpath;
-                return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
-            }
-
-            PCP::PartialCsvParser parser(*hook_csv,/* assert_column_size */ false);  // parses whole body of CSV without range options.
-
-            // parse header line
-            std::vector<std::string> hook_headers = parser.get_row();
-
-            std::string _header(hook_headers[0]);
-            size_t _idpos = _header.find("id=");
-
-            if(_idpos != 0){
-                std::stringstream msg;
-                msg << "File " << hookpath << " doesn't contain hook events, aborting";
-                return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
-            }
-
-            bool success = this->parseHookEvents(hook_csv);
-
-            if(success && hook_path.empty()){
-                hook_path = hookpath;
-            }
-
-            //}
-        }
-    }
-
-    if(!active){
-        std::stringstream msg;
-        msg << "Abort requested for video file " << videostem << "), aborting";
-        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
-    }
-
-    stop = getTickCount();
-    time = (double)(stop-start)/frequency;
-    std::cout << "Time taken to rematch timestamps: " << time << std::endl;
-    stop = start;
-    std::cout << std::flush;
-
-    /// Process filterings
     /*bool filtered = this->parseFilterings( filtering_list );
     if(filtered){*/
     bool applied = this->applyFilterings();
     /*}*/
-
+    if(!applied){
+        std::stringstream msg;
+        msg << "Error during conversion filtering, aborting";
+        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+    }
     stop = getTickCount();
     time = (double)(stop-start)/frequency;
     std::cout << "Time taken to apply filters: " << time << std::endl;
@@ -2565,23 +2565,10 @@ void InspectorWidgetProcessor::process(){
 
 
 bool InspectorWidgetProcessor::parseFilterings( std::vector<std::string>& filtering_list){
-
-    std::vector<std::string> supported_conversion_tests;
-    supported_conversion_tests.push_back("during");
-
-    std::vector<std::string> supported_conversion_actions;
-    supported_conversion_actions.push_back("matchFirstValueOf");
-    supported_conversion_actions.push_back("triggerBySegmentsOf");
-    //supported_conversion_actions.push_back("append");
-    //supported_conversion_actions.push_back("ifThenElse");
-    //supported_conversion_actions.push_back("ifThen");
-    supported_conversion_actions.push_back("eval");
-    supported_conversion_actions.push_back("nestByLastVariable");
-
     //filtering_list
     for(std::vector<std::string>::iterator _constraint = filtering_list.begin(); _constraint!= filtering_list.end();_constraint++){
         std::string _c = *_constraint;
-        std::cout << "Constraint: " << _c << std::endl;
+        std::cout << "Constraint " << _c << std::endl;
 
         size_t _t_end_loc = _c.find("(",0);
         if(_t_end_loc==std::string::npos){
@@ -3204,221 +3191,6 @@ bool InspectorWidgetProcessor::applyFilterings(){
             }
 
         }
-        else if(needsHookEvents){
-            PCP::CsvConfig* hook_csv = 0;
-            //if(argc>3 && ! std::string(argv[2]).empty()){
-
-            //std::string hookpath = datapath + std::string(argv[2]);
-
-            if(first_minute_frames == -1 || hook_path.empty()){
-                std::cout  << "First minute frame info necessary to parse hook events file " << hook_path << ", aborting..." << std::endl;
-                return 0;
-            }
-
-            try{
-                hook_csv = new PCP::CsvConfig(hook_path.c_str(),/*bool has_header_line*/ false);
-            }
-            catch(...){
-                std::cerr << "Couldn't open " << hook_path << std::endl;
-                return 0;
-            }
-
-            PCP::PartialCsvParser parser(*hook_csv,/* assert_column_size */ false);  // parses whole body of CSV without range options.
-
-            // parse header line
-            std::vector<std::string> hook_headers = parser.get_row();
-
-            std::string _header(hook_headers[0]);
-            size_t _idpos = _header.find("id=");
-
-            if(_idpos != 0){
-                std::cerr << "File " << hook_path << " doesn't contain hook events, aborting" << std::endl;
-                return 0;
-            }
-
-            StringBuffer sb_s,sb_o;
-            PrettyWriter<StringBuffer>* w_s = new  PrettyWriter<StringBuffer> (sb_s);
-            //PrettyWriter<StringBuffer>* w_o = new  PrettyWriter<StringBuffer> (sb_o);
-
-            header(*w_s);
-            //header(*w_o);
-
-            // instantiate parser
-            //PCP::PartialCsvParser parser(*hook_csv,/* assert_column_size */ false);  // parses whole body of CSV without range options.
-
-            // parse & print body lines
-            std::vector<std::string> row;
-            int r =0;
-            float daily_sec_from_start = start_t.h*3600 + start_t.m*60 + start_t.s;
-            float daily_sec_from_end = end_t.h*3600 + end_t.m*60 + end_t.s;
-            bool prev_event_is_mouse = false;
-            bool prev_event_is_keyboard = false;
-            std::string word;
-            float wordin(0.0), wordout(0.0);
-            std::string keychar("keychar="),keycode("keycode="),rawcode("rawcode="),rawcodehex("rawcode=0x"),xkey("x="),ykey("y=");
-            uint16_t keycharint;
-            std::string keycharstr;
-            uint16_t keycodeint = 0;
-            uint16_t rawcodeint = 0;
-            float keychartime(0.0),keycodetime(0.0),rawcodetime(0.0);
-            float _x(0.0),_y(0.0);
-            bool keycodeconformsword = false;
-
-            while (!(row = parser.get_row()).empty()) {
-
-                if(row.size()>2){
-
-                    std::string when("when=");
-                    std::string timerow(row[1]);
-                    size_t whenpos = timerow.find(when);
-
-                    if(whenpos == 0){
-                        std::string whenstring = timerow.substr(when.size());
-                        long whenval = atol(whenstring.c_str());
-                        double whensec = (double)whenval/1000.0;
-                        time_t whentime = (long)(whensec);
-                        struct timeval tv;
-                        struct tm * now = localtime( & whentime );
-                        double tm_sec = now->tm_sec +  whensec - whentime;
-                        float daily_sec_from_now = now->tm_hour*3600 + now->tm_min*60 + tm_sec;
-
-                        if( daily_sec_from_now >= daily_sec_from_start && daily_sec_from_now <= daily_sec_from_end){
-
-                            //std::cout << "when: " << now->tm_hour << "h " << now->tm_min << "m "  << tm_sec << "s " << std::endl;
-                            /*
-                    if(whensec == 1427809756.977 || whensec == 1427810230.729) // spaceship || Cmd+Fpop
-                        bool stophere = true;
-
-                    bool cur_event_is_mouse = false;
-                    bool cur_event_is_keyboard = false;
-                    if(row.size() == 5 && (row[3].find(keycode) != std::string::npos || row[3].find(keychar) != std::string::npos)){
-                        cur_event_is_keyboard = true;
-                        size_t keycharpos = row[3].find(keychar);
-                        size_t keycodepos = row[3].find(keycode);
-                        size_t rawcodepos = row[4].find(rawcode);
-                        size_t rawcodehexpos = row[4].find(rawcodehex);
-                        if( keycharpos != std::string::npos ){
-                            keycharstr = row[3].substr(keycharpos+keychar.size());
-                            keycharint = atoi(keycharstr.c_str());
-                            keychartime = daily_sec_from_now;
-                        }
-                        if( keycodepos != std::string::npos  ){
-                            keycodeint = atoi(row[3].substr(keycodepos+keycode.size()).c_str());
-                            keycodetime = daily_sec_from_now;
-                            keycodeconformsword = canformword(keycodeint);
-                        }
-                        if( rawcodepos != std::string::npos  ){
-                            if( rawcodehexpos != std::string::npos  ){
-                                rawcodeint = strtoul(row[4].substr(rawcodehexpos+rawcodehex.size()).c_str(), NULL, 16);
-                            }
-                            else{
-                                rawcodeint = atoi(row[4].substr(rawcodepos+rawcode.size()).c_str());
-                            }
-                            rawcodetime = daily_sec_from_now;
-                        }
-                        if(keycodetime == keychartime && keycodeconformsword){
-                            if(word.empty()){
-                                wordin = (daily_sec_from_now - daily_sec_from_start)*fps;
-                            }
-                            word += keycharstr;
-                            wordout = (daily_sec_from_now - daily_sec_from_start)*fps;
-                        }
-                    }
-                    else if(row.size()==7 && row[3].find("x=") != std::string::npos && row[4].find("y=") != std::string::npos){
-                        cur_event_is_mouse = true;
-
-                        size_t xkeypos = row[3].find(xkey);
-                        size_t ykeypos = row[4].find(ykey);
-                        if(xkeypos == 0 && ykeypos == 0){
-                            _x = atof(row[3].substr(xkey.size()).c_str());
-                            _y = atof(row[4].substr(ykey.size()).c_str());
-                        }
-
-                    }
-
-                    if( (prev_event_is_keyboard && !cur_event_is_keyboard) || (cur_event_is_keyboard && !keycodeconformsword ) ){
-                        //std::cout << "when: " << now->tm_hour << "h " << now->tm_min << "m "  << tm_sec << "s " ;//<< std::endl;
-                        //std::cout << "Prev word'" << word << "'" << std::endl;
-                        std::string spacey(word);
-                        spacey.erase (std::remove(spacey.begin(), spacey.end(), ' '), spacey.end());
-
-                        if(word.size()>0 && spacey.size()>0){
-                            wordout = (daily_sec_from_now - daily_sec_from_start)*fps;
-                            //                        overlay(*w_o, wordin,wordout,
-                            //                                _x/(float)video_w,
-                            //                                _y/(float)video_h,
-                            //                                20/(float)video_w,
-                            //                                20/(float)video_h,
-                            //                                word
-                            //                                );
-                            segment(*w_s, wordin,wordout, word);
-                        }
-                        word.erase();
-
-                        //keycharconformsword = false;
-                        //keycodeconfomsword = false;
-                    }
-
-                    prev_event_is_mouse = cur_event_is_mouse;
-                    prev_event_is_keyboard = cur_event_is_keyboard;
-
-                    //                    stringstream timecode;
-                    //                    timecode << (now->tm_year + 1900) << '-';
-                    //                    if(now->tm_mon + 1 < 10)
-                    //                        timecode << "0";
-                    //                    timecode << (now->tm_mon + 1) << '-';
-                    //                    if(now->tm_mday < 10)
-                    //                        timecode << "0";
-                    //                    timecode << now->tm_mday << '-';
-                    //                    if(now->tm_hour < 10)
-                    //                        timecode << "0";
-                    //                    timecode<< now->tm_hour << '-';
-                    //                    if(now->tm_min < 10)
-                    //                        timecode << "0";
-                    //                    timecode<< now->tm_min << '-';
-                    //                    if(now->tm_sec < 10)
-                    //                        timecode << "0";
-                    //                    timecode<< now->tm_sec;
-*/
-
-
-                        }
-                    }
-
-                }
-
-                r++;
-
-            }
-
-            std::string label("Words");
-            //overlayfooter(*w_o,label,wordout);
-            segmentfooter(*w_s,label,wordout,this->fps);
-
-            //    std::cout << sb_o.GetString() << endl;
-            //    std::cout << std::endl;
-
-            //    std::ofstream overlayfile;
-            //    std::string overlayfilepath = datapath + videostem + std::string("-") + label + std::string("-overlays.json");
-            //    overlayfile.open(overlayfilepath.c_str());
-
-            //    if(overlayfile.is_open()){
-            //        overlayfile << sb_o.GetString();
-            //        overlayfile.close();
-            //    }
-
-            //std::cout << sb_s.GetString() << endl;
-            std::cout << std::endl;
-
-            std::ofstream segmentfile;
-            std::string segmentfilepath = datapath + videostem + std::string("-") + label + std::string("-segments.json");
-            segmentfile.open(segmentfilepath.c_str());
-
-            if(segmentfile.is_open()){
-                segmentfile << sb_s.GetString();
-                segmentfile.close();
-            }
-        }
 
         stop = getTickCount();
         time = (double)(stop-start)/frequency;
@@ -3482,242 +3254,238 @@ bool InspectorWidgetProcessor::parseFirstMinuteFrameFile(PCP::CsvConfig* cv_csv)
     return false;
 }
 
-bool InspectorWidgetProcessor::parseHookEvents(PCP::CsvConfig* cv_csv){
-
-    if(!cv_csv){
-        return 0;
+bool InspectorWidgetProcessor::checkHookEvents(std::ifstream& hook_txt){
+    hook_txt.seekg(ios::beg);
+    std::string line;
+    getline(hook_txt,line);
+    hook_txt.seekg(ios::beg);
+    if(line.empty()){
+        return false;
     }
+    std::string id("id=");
+    size_t idpos = line.find(id);
+    if(idpos == string::npos){
+        return false;
+    }
+    std::string when("when=");
+    size_t whenpos = line.find(when);
+    if(whenpos == string::npos){
+        return false;
+    }
+    return true;
+}
+
+bool InspectorWidgetProcessor::parseHookEvents(std::ifstream& hook_txt, bool using_clocktime){
 
     int stop;
     double time;
     int start = getTickCount();
     double frequency = getTickFrequency();
 
-    std::ofstream wordsfile;
-    std::string wordsfilepath = datapath + videostem + std::string("_") + "Words" + std::string(".csv");
-    wordsfile.open(wordsfilepath.c_str());
+    std::map<std::string,StringBuffer> s_o,s_s;
+    std::map<std::string,PrettyWriter<StringBuffer>* > w_o,w_s;
 
-    if(!wordsfile.is_open()){
-        std::cerr << "Couldn't open " << wordsfilepath << ", aborting... "<< std::endl;
-        return false;
+    bool getWords = false;
+    std::string wordshook("Words");
+
+    for(std::vector<std::string>::iterator inputhook = inputhooks.begin(); inputhook != inputhooks.end();inputhook++ ){
+        s_o[*inputhook] = StringBuffer();
+        s_s[*inputhook] = StringBuffer();
+        PrettyWriter<StringBuffer>* _o = new PrettyWriter<StringBuffer>(s_o[*inputhook]);
+        PrettyWriter<StringBuffer>* _s = new PrettyWriter<StringBuffer>(s_s[*inputhook]);
+        w_o[*inputhook] = _o;
+        w_s[*inputhook] = _s;
+        header(*_o);
+        header(*_s);
+        if(inputhook_action[*inputhook] == "getWords"){
+            getWords = true;
+            wordshook = *inputhook;
+        }
     }
-    wordsfile << "\"Frame\",\"Words_x\",\"Words_y\",\"Words_txt\"" << std::endl;
-
-    StringBuffer sb_s,sb_o;
-    PrettyWriter<StringBuffer>* w_s = new  PrettyWriter<StringBuffer> (sb_s);
-    //PrettyWriter<StringBuffer>* w_o = new  PrettyWriter<StringBuffer> (sb_o);
-
-    header(*w_s);
-    //header(*w_o);
-
-    // instantiate parser
-    PCP::PartialCsvParser parser(*cv_csv,/* assert_column_size */ false);  // parses whole body of CSV without range options.
 
     // parse & print body lines
-    std::vector<std::string> row;
+    std::string line;
     int r =0;
-    float daily_sec_from_start = start_t.h*3600 + start_t.m*60 + start_t.s;
-    float daily_sec_from_end = end_t.h*3600 + end_t.m*60 + end_t.s;
+    std::string ts;
+    double ts_start,ts_end;
+    if(using_clocktime){
+        ts = "clock";
+        ts_start = double(this->start_clock )/1000000000.0;
+        ts_end = double(this->end_clock )/1000000000.0;
+    }
+    else {
+        ts = "when";
+        ts_start = start_t.h*3600 + start_t.m*60 + start_t.s;
+        ts_end = end_t.h*3600 + end_t.m*60 + end_t.s;
+    }
     bool prev_event_is_mouse = false;
     bool prev_event_is_keyboard = false;
     std::string word;
     float wordin(0.0), wordout(0.0);
-    std::string keychar("keychar="),keycode("keycode="),rawcode("rawcode="),rawcodehex("rawcode=0x"),xkey("x="),ykey("y=");
-    uint16_t keycharint;
-    std::string keycharstr;
-    uint16_t keycodeint = 0;
-    uint16_t rawcodeint = 0;
-    float keychartime(0.0),keycodetime(0.0),rawcodetime(0.0);
+    uint16_t keychar_int;
+    std::string keychar_str;
+    uint16_t keycode_int = 0;
+    uint16_t rawcode_int = 0;
+    float keychar_time(0.0),keycode_time(0.0),rawcode_time(0.0);
     float __x(0.0),__y(0.0);
     std::vector<float> _x,_y;
     std::vector<std::string> _words;
-    bool keycodeconformsword = false;
+    bool keycode_canformword = false;
+    bool keychar_canformword = false;
 
     int _frame = 0;
 
-    while (!(row = parser.get_row()).empty()) {
-
+    while (getline(hook_txt,line)) {
+        std::vector<std::string> row = splitconstraint(line,',');
+        std::map<std::string,std::string> val;
+        for(std::vector<std::string>::iterator r = row.begin(); r != row.end(); r++){
+            std::vector<std::string> col = splitconstraint(*r,'=');
+            if(col.size()!=2){
+                std::cout << "Malformed file" << std::endl;
+                return false;
+            }
+            val[col[0]] = col[1];
+        }
         if(row.size()>2){
+            std::map<std::string,std::string>::iterator ts_it = val.find(ts);
+            if(ts_it != val.end()){
+                bool ts_match = false;
+                std::string ts_string = ts_it->second;
+                long ts_val = atol(ts_string.c_str());
+                double ts_now;
+                if(using_clocktime){
+                    ts_now = double(ts_val)/1000000000.0;
+                    ts_match = (ts_val > this->start_clock && ts_val < this->end_clock);
+                }
+                else{
+                    double ts_sec = (double)ts_val/1000.0;
+                    time_t ts_time = (long)(ts_sec);
+                    struct timeval tv;
+                    struct tm * now = localtime( & ts_time );
+                    double tm_sec = now->tm_sec +  ts_sec - ts_time;
+                    ts_now = now->tm_hour*3600 + now->tm_min*60 + tm_sec;
+                    ts_match = (ts_now >= ts_start && ts_now <= ts_end);
+                }
 
-            std::string when("when=");
-            std::string timerow(row[1]);
-            size_t whenpos = timerow.find(when);
-
-            if(whenpos == 0){
-                std::string whenstring = timerow.substr(when.size());
-                long whenval = atol(whenstring.c_str());
-                double whensec = (double)whenval/1000.0;
-                time_t whentime = (long)(whensec);
-                struct timeval tv;
-                struct tm * now = localtime( & whentime );
-                double tm_sec = now->tm_sec +  whensec - whentime;
-                float daily_sec_from_now = now->tm_hour*3600 + now->tm_min*60 + tm_sec;
-
-                if( daily_sec_from_now >= daily_sec_from_start && daily_sec_from_now <= daily_sec_from_end){
-
+                if(ts_match){
                     //std::cout << "when: " << now->tm_hour << "h " << now->tm_min << "m "  << tm_sec << "s " << std::endl;
-
                     bool cur_event_is_mouse = false;
                     bool cur_event_is_keyboard = false;
-                    if(row.size() == 5 && (row[3].find(keycode) != std::string::npos || row[3].find(keychar) != std::string::npos)){
+                    std::map<std::string,std::string>::iterator keychar_it = val.find("keychar");
+                    std::map<std::string,std::string>::iterator keycode_it = val.find("keycode");
+                    std::map<std::string,std::string>::iterator rawcode_it = val.find("rawcode");
+                    std::map<std::string,std::string>::iterator x_it = val.find("x");
+                    std::map<std::string,std::string>::iterator y_it = val.find("y");
+                    //std::map<std::string,std::string>::iterator button_it = val.find("button");
+                    //std::map<std::string,std::string>::iterator clicks_it = val.find("clicks");
+                    if(keycode_it != val.end() || keychar_it != val.end()){
                         cur_event_is_keyboard = true;
-                        size_t keycharpos = row[3].find(keychar);
-                        size_t keycodepos = row[3].find(keycode);
-                        size_t rawcodepos = row[4].find(rawcode);
-                        size_t rawcodehexpos = row[4].find(rawcodehex);
-                        if( keycharpos != std::string::npos ){
-                            keycharstr = row[3].substr(keycharpos+keychar.size());
-                            keycharint = atoi(keycharstr.c_str());
-                            keychartime = daily_sec_from_now;
+                        if( keychar_it != val.end() ){
+                            keychar_str = keychar_it->second;
+                            keychar_int = atoi(keychar_str.c_str());
+                            keychar_time = ts_now;
+                            keychar_canformword = canformword(keychar_str);
                         }
-                        if( keycodepos != std::string::npos  ){
-                            keycodeint = atoi(row[3].substr(keycodepos+keycode.size()).c_str());
-                            keycodetime = daily_sec_from_now;
-                            keycodeconformsword = canformword(keycodeint);
+                        if( keycode_it != val.end()  ){
+                            keycode_int = atoi(keycode_it->second.c_str());
+                            keycode_time = ts_now;
+                            keycode_canformword = canformword(keycode_int);
                         }
-                        if( rawcodepos != std::string::npos  ){
-                            if( rawcodehexpos != std::string::npos  ){
-                                rawcodeint = strtoul(row[4].substr(rawcodehexpos+rawcodehex.size()).c_str(), NULL, 16);
+                        if( rawcode_it != val.end()  ){
+                            std::string rawcode_str = rawcode_it->second;
+                            size_t rawcodehex_pos = rawcode_str.find("0x");
+                            if( rawcodehex_pos == 0  ){
+                                rawcode_int = strtoul(rawcode_str.substr(2).c_str(), NULL, 16);
                             }
                             else{
-                                rawcodeint = atoi(row[4].substr(rawcodepos+rawcode.size()).c_str());
+                                rawcode_int = atoi(rawcode_str.c_str());
                             }
-                            rawcodetime = daily_sec_from_now;
+                            rawcode_time = ts_now;
                         }
-                        if(keycodetime == keychartime && keycodeconformsword){
+                        if(keycode_time == keychar_time && keychar_canformword/*keycode_canformword*/){
                             if(word.empty()){
-                                wordin = (daily_sec_from_now - daily_sec_from_start)*fps;
+                                wordin = (ts_now - ts_start)*fps;
                             }
-                            if(keycodeint == VC_BACKSPACE && !word.empty()){
+                            if(keycode_int == VC_BACKSPACE && !word.empty()){
                                 word = word.substr(0,word.size()-1);
                             }
                             else{
-                                word += keycharstr;
+                                word += keychar_str;
                             }
-                            wordout = (daily_sec_from_now - daily_sec_from_start)*fps;
+                            wordout = (ts_now - ts_start)*fps;
                         }
                     }
-                    else if(row.size()==7 && row[3].find("x=") != std::string::npos && row[4].find("y=") != std::string::npos){
+                    else if(x_it != val.end() || y_it != val.end()){
                         cur_event_is_mouse = true;
-
-                        size_t xkeypos = row[3].find(xkey);
-                        size_t ykeypos = row[4].find(ykey);
-                        if(xkeypos == 0 && ykeypos == 0){
-                            __x = atof(row[3].substr(xkey.size()).c_str());
-                            __y = atof(row[4].substr(ykey.size()).c_str());
-                        }
-
+                        __x = atof(x_it->second.c_str());
+                        __y = atof(x_it->second.c_str());
                     }
 
-                    if( (prev_event_is_keyboard && !cur_event_is_keyboard) || (cur_event_is_keyboard && !keycodeconformsword ) ){
+                    if( (prev_event_is_keyboard && !cur_event_is_keyboard) || (cur_event_is_keyboard && !keychar_canformword/*!keycode_canformword*/ ) ){
                         //std::cout << "when: " << now->tm_hour << "h " << now->tm_min << "m "  << tm_sec << "s " ;//<< std::endl;
                         //std::cout << "Prev word'" << word << "'" << std::endl;
                         std::string spacey(word);
                         spacey.erase (std::remove(spacey.begin(), spacey.end(), ' '), spacey.end());
 
                         if(word.size()>0 && spacey.size()>0){
-                            wordout = (daily_sec_from_now - daily_sec_from_start)*fps;
-                            //                        overlay(*w_o, wordin,wordout,
-                            //                                _x/(float)video_w,
-                            //                                _y/(float)video_h,
-                            //                                20/(float)video_w,
-                            //                                20/(float)video_h,
-                            //                                word
-                            //                                );
+                            wordout = (ts_now - ts_start)*fps;
 
                             while(_frame < wordin && _frame < this->video_frames){
-                                wordsfile << _frame << ", , , " << std::endl;
                                 _x.push_back(0.0);
                                 _y.push_back(0.0);
                                 _words.push_back(" ");
                                 _frame++;
                             }
                             while(_frame < wordout && _frame < this->video_frames){
-                                wordsfile << _frame << "," << __x << "," << __y << "," << word << std::endl;
                                 _x.push_back(__x);
                                 _y.push_back(__y);
                                 _words.push_back(word);
                                 _frame++;
                             }
 
-
-
-                            segment(*w_s, wordin,wordout,this->fps, word);
+                            if(getWords){
+                                segment(*w_s[wordshook], wordin, wordout, this->fps, word);
+                                //overlay(*w_o[wordshook], wordin, wordout, this->fps, __x/(float)video_w, __y/(float)video_h, 20/(float)video_w, 20/(float)video_h, word);
+                                //std::cout << "word '" << word << "' @ " << wordin << " " << wordout << std::endl;
+                            }
                         }
                         word.erase();
 
-                        //keycharconformsword = false;
-                        //keycodeconfomsword = false;
+                        keychar_canformword = false;
+                        keycode_canformword = false;
                     }
 
                     prev_event_is_mouse = cur_event_is_mouse;
                     prev_event_is_keyboard = cur_event_is_keyboard;
-
-                    //                    stringstream timecode;
-                    //                    timecode << (now->tm_year + 1900) << '-';
-                    //                    if(now->tm_mon + 1 < 10)
-                    //                        timecode << "0";
-                    //                    timecode << (now->tm_mon + 1) << '-';
-                    //                    if(now->tm_mday < 10)
-                    //                        timecode << "0";
-                    //                    timecode << now->tm_mday << '-';
-                    //                    if(now->tm_hour < 10)
-                    //                        timecode << "0";
-                    //                    timecode<< now->tm_hour << '-';
-                    //                    if(now->tm_min < 10)
-                    //                        timecode << "0";
-                    //                    timecode<< now->tm_min << '-';
-                    //                    if(now->tm_sec < 10)
-                    //                        timecode << "0";
-                    //                    timecode<< now->tm_sec;
-
-
                 }
             }
 
         }
-
         r++;
-
     }
 
-    std::string label("Words");
-    //overlayfooter(*w_o,label,wordout);
-    segmentfooter(*w_s,label,wordout,this->fps);
-
-    //    std::cout << sb_o.GetString() << endl;
-    //    std::cout << std::endl;
-
-    //    std::ofstream overlayfile;
-    //    std::string overlayfilepath = datapath + videostem + std::string("-") + label + std::string("-overlays.json");
-    //    overlayfile.open(overlayfilepath.c_str());
-
-    //    if(overlayfile.is_open()){
-    //        overlayfile << sb_o.GetString();
-    //        overlayfile.close();
-    //    }
-
-    //std::cout << sb_s.GetString() << endl;
-    std::cout << std::endl;
-
-    std::ofstream segmentfile;
-    std::string segmentfilepath = datapath + videostem + std::string("-") + label + std::string("-segments.json");
-    segmentfile.open(segmentfilepath.c_str());
-
-    if(segmentfile.is_open()){
-        segmentfile << sb_s.GetString();
-        segmentfile.close();
+    for(std::vector<std::string>::iterator inputhook = inputhooks.begin(); inputhook != inputhooks.end();inputhook++ ){
+        std::string label = *inputhook;
+        //overlayfooter(*w_o[*inputhook],label,wordout);
+        segmentfooter(*w_s[*inputhook],label,wordout,this->fps);
+        std::ofstream segmentfile;
+        std::string segmentfilepath = datapath + videostem + std::string("-") + label + std::string("-segments.json");
+        segmentfile.open(segmentfilepath.c_str());
+        if(segmentfile.is_open()){
+            segmentfile << s_s[*inputhook].GetString();
+            segmentfile.close();
+        }
+        delete(w_o[*inputhook]);
+        delete(w_s[*inputhook]);
     }
-
-    log_x["Words"] = _x;
-    log_y["Words"] = _y;
-    log_txt["Words"] = _words;
-
-    wordsfile.close();
+    s_o.clear();
+    s_s.clear();
+    w_o.clear();
+    w_s.clear();
 
     stop = getTickCount();
     time = (double)(stop-start)/frequency;
-    std::cout << "Time taken to parse csv and save jsons: " << time << std::endl;
+    std::cout << "Time taken to parse hook events and save jsons: " << time << std::endl;
 
     return true;
 }
@@ -4080,14 +3848,14 @@ std::vector<float> InspectorWidgetProcessor::getAccessibilityUnderMouse(float _t
         float wt = wy/float(this->video_h);
         float wb = (wy+wh)/float(this->video_h);
 
-//        std::cout << "@ " << closest_window_node.attribute("clock").as_llong();
-//        std::cout << " window " << n.attribute("app").as_string() << ":" << n.attribute("title").as_string() ;
-//        std::cout << " wl=" << wl << " wr=" << wr << " wt=" << wt << " wb=" << wb << " ";
-//        std::cout << " x=" << x << " y=" << y;
+        //        std::cout << "@ " << closest_window_node.attribute("clock").as_llong();
+        //        std::cout << " window " << n.attribute("app").as_string() << ":" << n.attribute("title").as_string() ;
+        //        std::cout << " wl=" << wl << " wr=" << wr << " wt=" << wt << " wb=" << wb << " ";
+        //        std::cout << " x=" << x << " y=" << y;
 
         if( wl < x && x < wr && wt < y && y < wb){
             /// For each window that contains x and y, find the closest preceeding application node, parse to find the appropriate widget
-//            std::cout << " matches ";
+            //            std::cout << " matches ";
 
             /// Use window dimensions
             rect[0] = wl;
@@ -4105,10 +3873,10 @@ std::vector<float> InspectorWidgetProcessor::getAccessibilityUnderMouse(float _t
                     if (tpath)
                     {
                         pugi::xml_node w = tpath.node();
-//                        std::cout << std::endl;
-//                        std::cout << " @ " << t.attribute("clock").as_llong();
-//                        std::cout << " name " << w.name();// << std::endl;
-//                        std::cout << " AXTitle " << w.attribute("AXTitle").as_string() << std::endl;
+                        //                        std::cout << std::endl;
+                        //                        std::cout << " @ " << t.attribute("clock").as_llong();
+                        //                        std::cout << " name " << w.name();// << std::endl;
+                        //                        std::cout << " AXTitle " << w.attribute("AXTitle").as_string() << std::endl;
 
                         /// Parse all window children to find a more precise target, depth first
                         std::map<float, std::vector<float> > _rects;
@@ -4121,7 +3889,7 @@ std::vector<float> InspectorWidgetProcessor::getAccessibilityUnderMouse(float _t
                             /// Make sure to parse all first-order children of the window
                             if(c.parent() == w){
                                 _nfc = c.next_sibling();
-//                                std::cout << " (nfc=" << _nfc.name() << ") ";
+                                //                                std::cout << " (nfc=" << _nfc.name() << ") ";
                             }
                             std::string _wf = c.attribute("AXFrame").as_string();
                             std::vector<std::string> _wps = splitconstraint(_wf,' ');
@@ -4129,10 +3897,10 @@ std::vector<float> InspectorWidgetProcessor::getAccessibilityUnderMouse(float _t
                             float _wy = 0.0;
                             float _ww = 0.0;
                             float _wh = 0.0;
-//                            std::cout << _tab;
-//                            std::cout << " child " << c.name();
-//                            std::cout << " AXTitle " << c.attribute("AXFrame").as_string();
-//                            std::cout << " AXFrame " << _wf;
+                            //                            std::cout << _tab;
+                            //                            std::cout << " child " << c.name();
+                            //                            std::cout << " AXTitle " << c.attribute("AXFrame").as_string();
+                            //                            std::cout << " AXFrame " << _wf;
                             for(std::vector<std::string>::iterator _wp = _wps.begin(); _wp!=_wps.end();_wp++){
                                 std::string _wn = _wp->substr(0,1);
                                 std::string _wv = _wp->substr(2,_wp->length()-1);
@@ -4153,11 +3921,11 @@ std::vector<float> InspectorWidgetProcessor::getAccessibilityUnderMouse(float _t
                             float _wr = (_wx+_ww)/float(this->video_w);
                             float _wt = _wy/float(this->video_h);
                             float _wb = (_wy+_wh)/float(this->video_h);
-//                            std::cout << " wl=" << _wl << " wr=" << _wr << " wt=" << _wt << " wb=" << _wb << " ";
-//                            std::cout << " x=" << x << " y=" << y;
+                            //                            std::cout << " wl=" << _wl << " wr=" << _wr << " wt=" << _wt << " wb=" << _wb << " ";
+                            //                            std::cout << " x=" << x << " y=" << y;
 
                             if( _wl < x && x < _wr && _wt < y && y < _wb){
-//                                std::cout << " MATCHES ";
+                                //                                std::cout << " MATCHES ";
                                 std::vector<float> _rect(4,0.0);
                                 _rect[0] = _wl;
                                 _rect[1] = _wt;
@@ -4166,7 +3934,7 @@ std::vector<float> InspectorWidgetProcessor::getAccessibilityUnderMouse(float _t
 
                                 /// Map all rect candidates by area
                                 _rects[ (_wr-_wl)*(_wb-_wt) ] = _rect;
-//                                std::cout << std::endl;
+                                //                                std::cout << std::endl;
                                 _w = _w.first_child();
                                 _tab += " ";
                                 matching_widget = true;
@@ -4179,20 +3947,20 @@ std::vector<float> InspectorWidgetProcessor::getAccessibilityUnderMouse(float _t
                                 _tab = " ";
                             }
 
-//                            std::cout << std::endl;
+                            //                            std::cout << std::endl;
                         }
                         /// Choose the rect candidate with minimal area (if any)
                         if(_rects.size()>0){
                             rect = _rects.begin()->second;
                         }
-//                        std::cout << std::endl;
+                        //                        std::cout << std::endl;
                         return rect;
                     }
                 }
             }
             break;
         }
-//        std::cout << std::endl;
+        //        std::cout << std::endl;
     }
     return rect;
 }
