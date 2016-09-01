@@ -30,10 +30,24 @@
 #include <list>
 #include <set>
 
-#include "opencv2/imgcodecs.hpp"
+#include "opencv2/core/version.hpp"
+#include "opencv2/core/core.hpp"
+#define CV_VERSION_CHECK(major, minor, patch) ((major<<16)|(minor<<8)|(patch))
+#define CV_VERSION_      CV_VERSION_CHECK(CV_MAJOR_VERSION, CV_MINOR_VERSION, CV_SUBMINOR_VERSION)
+#if CV_VERSION_ >= CV_VERSION_CHECK(3, 0, 0)
+//#include "opencv2/imgcodecs.hpp"
+#else
+#define CAP_PROP_FRAME_WIDTH CV_CAP_PROP_FRAME_WIDTH 
+#define CAP_PROP_FRAME_HEIGHT CV_CAP_PROP_FRAME_HEIGHT
+#define CAP_PROP_FPS CV_CAP_PROP_FPS 
+#define CAP_PROP_FRAME_COUNT CV_CAP_PROP_FRAME_COUNT 
+#define CAP_PROP_POS_FRAMES CV_CAP_PROP_POS_FRAMES
+#ifndef WINDOW_KEEPRATIO
+#define WINDOW_KEEPRATIO 0x00000000
+#endif
+#endif
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
-
 #include "InspectorWidgetProcessorCommandParser.h"
 
 ////Methods:
