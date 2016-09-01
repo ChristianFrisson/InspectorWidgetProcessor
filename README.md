@@ -22,7 +22,9 @@ InspectorWidget is targeted at end users, usability experts, user experience and
 
 The Processor tool is a cross-platform server for automating annotations. 
 
-It is based on:
+## Dependencies
+
+InspectorWidget Processor is based on:
 - [cmake-js](https://github.com/cmake-js/cmake-js) / [cmake-js](https://github.com/cmake-js/cmake-js): a Node.js/io.js native addon build tool
 - [ColinH](https://github.com/ColinH) / [PEGTL](https://github.com/ColinH/PEGTL): a grammar/syntax lexer/parser
 - [kwhat](https://github.com/kwhat) / [libuiohook](https://github.com/kwhat/libuiohook): a library for hooking input events
@@ -31,6 +33,19 @@ It is based on:
 - [laysakura](https://github.com/laysakura) / [PartialCsvParser](https://github.com/laysakura/PartialCsvParser): a library for comma-separated value (CSV) file I/O
 - [miloyip](https://github.com/miloyip) / [rapidjson](https://github.com/miloyip/rapidjson): a library for JSON file I/O
 
+Instructions
+* Mac OSX 10.6+ with MacPorts
+```sudo port install opencv +ffmpeg```
+```sudo port install npm```
+* Mac OSX 10.6+ with Homebrew
+```brew install opencv --with-ffmpeg --with-tbb```
+```brew install npm```
+* Ubuntu 16.04
+```
+sudo apt install npm libopencv-dev libxtst-dev libxt-dev libxkbfile-dev libx11-xcb-dev libxkbcommon-dev libxkbcommon-x11-dev
+sudo update-alternatives --install /usr/bin/node node /usr/bin/nodejs 10
+```
+
 ## Installation
 
 First clone the repository.
@@ -38,6 +53,7 @@ Then open a terminal in the source directory (`<source_path>`), Internet connexi
 * update all submodules: 
 ```git submodule update --init```
 * install node dependencies
+```sudo npm i cmake-js -g```
 ```npm install```
 
 ## License
