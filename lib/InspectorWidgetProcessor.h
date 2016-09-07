@@ -91,6 +91,10 @@ struct InspectorWidgetDate {
     int m;
     int d;
     InspectorWidgetDate():y(-1),m(-1),d(-1){}
+    bool operator==(const InspectorWidgetDate& _d)
+    {
+        return ( _d.y == y && _d.m == m && _d.d == d);
+    }
 };
 
 struct InspectorWidgetTime {
@@ -98,6 +102,10 @@ struct InspectorWidgetTime {
     int m;
     float s;
     InspectorWidgetTime():h(-1),m(-1),s(-1){}
+    bool operator==(const InspectorWidgetTime& _t)
+    {
+        return ( _t.h == h && _t.m == m && _t.s == s);
+    }
 };
 
 class InspectorWidgetProcessor{
@@ -109,6 +117,8 @@ public:
     //std::map<std::string, std::vector<float> > parseCSV(std::string file);
     std::map< std::string, std::map<std::string, std::vector<float> > > parseCSV(std::string file);
 
+public:
+
     std::string getStatusError();
     std::string getStatusSuccess();
     std::string getStatusPhase();
@@ -118,8 +128,8 @@ public:
     float getElapsedSeconds(float timestamp);
 
     std::string getTemplateAnnotation(std::string name);
-
-    std::string getAccessibilityAnnotation(std::string name);
+    std::vector<std::string> getAccessibilityAnnotations(std::vector<std::string> names);
+    std::vector<std::string> getAnnotations(std::vector<std::string> names);
     
     /// getAccessibilityUnderMouse
     /// time in sec
@@ -137,8 +147,8 @@ public:
     bool parseComputerVisionEvents(PCP::CsvConfig* cv_csv);
     bool parseClockTimestampsFile(std::string _path);
     bool parseFirstMinuteFrameFile(PCP::CsvConfig* fmf_csv);
-    bool checkHookEvents(std::ifstream& hook_txt);
-    bool parseHookEvents(std::ifstream& hook_txt, bool using_clocktime);
+    bool checkHookEvents(std::string hook_path);
+    std::vector<std::string> parseHookEvents(std::string hook_path, std::vector<std::string> names, bool using_clocktime);
     bool parseFilterings( std::vector<std::string>& filtering_list);
     bool applyFilterings();
 
@@ -288,6 +298,12 @@ protected:
     std::map<std::string,std::vector<std::string> > inputhook_deps;
     std::map<std::string,std::string> inputhook_action;
     std::map<std::string,std::vector<std::string> > inputhook_variables;
+
+    std::vector<std::string> ax_annotations;
+    std::map<std::string,std::string> ax_test;
+    std::map<std::string,std::vector<std::string> > ax_deps;
+    std::map<std::string,std::string> ax_action;
+    std::map<std::string,std::vector<std::string> > ax_variables;
 
     int match_method;
     int max_Trackbar;

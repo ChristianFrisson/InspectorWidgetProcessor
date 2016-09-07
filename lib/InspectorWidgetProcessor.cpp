@@ -435,14 +435,15 @@ InspectorWidgetProcessor::InspectorWidgetProcessor(){
     //supported_conversion_actions.push_back("ifThenElse");
     //supported_conversion_actions.push_back("ifThen");
 
-    supported_accessibility_tests.push_back("during");
+    //supported_accessibility_tests.push_back("during");
     supported_accessibility_tests.push_back(""); // make test statements optional
 
-    //supported_accessibility_actions.push_back("getFocusApplication");
-    //supported_accessibility_actions.push_back("getFocusWindow");
-    //supported_accessibility_actions.push_back("getPointedWidget");
+    supported_accessibility_actions.push_back("getFocusApplication");
+    supported_accessibility_actions.push_back("getFocusWindow");
+    supported_accessibility_actions.push_back("getPointedWidget");
+    supported_accessibility_actions.push_back("getWorkspaceSnapshot");
 
-    supported_input_hook_tests.push_back("during");
+    //supported_input_hook_tests.push_back("during");
     supported_input_hook_tests.push_back(""); // make test statements optional
 
     supported_input_hook_actions.push_back("getWords");
@@ -537,6 +538,12 @@ void InspectorWidgetProcessor::clear(){
     inputhook_deps.clear();
     inputhook_action.clear();
     inputhook_variables.clear();
+
+    ax_annotations.clear();
+    ax_test.clear();
+    ax_deps.clear();
+    ax_action.clear();
+    ax_variables.clear();
 }
 
 InspectorWidgetProcessor::~InspectorWidgetProcessor(){
@@ -2030,7 +2037,11 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
         }
         /// Process accessibility statements:
         else if(forAccessibility){
-
+            ax_annotations.push_back(_n);
+            ax_test[_n] = _t;
+            ax_deps[_n] = _vs;
+            ax_action[_n] = _a;
+            ax_variables[_n] = _avs;
         }
         /// Process hook input statements:
         else if(forInputHooks){
@@ -2053,16 +2064,9 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
     }
 
     /// Check for existing hook input file
-    std::ifstream hook_txt;
     if(needsHookEvents){
         this->hook_path = datapath + videostem + ".txt";
-        hook_txt.open(hook_path.c_str());
-        if(!hook_txt.is_open()){
-            std::stringstream msg;
-            msg <<  "Couldn't open hook input file " << hook_path;
-            return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
-        }
-        bool hook_success = this->checkHookEvents(hook_txt);
+        bool hook_success = this->checkHookEvents(hook_path);
         if(!hook_success){
             std::stringstream msg;
             msg << "Error while parsing hook input file " << hook_path << " , aborting";
@@ -2238,7 +2242,8 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
     /// Process hook input constraints
     bool hi_pre_success = false;
     if(needsHookEvents){
-        hi_pre_success = this->parseHookEvents(hook_txt,ts_success);
+        this->hook_path = datapath + videostem + ".txt";
+        hi_pre_success = !this->parseHookEvents(hook_path,inputhooks,ts_success).empty();
         if(!hi_pre_success){
             std::stringstream msg;
             msg << "Error during hook input processing, aborting";
@@ -2247,6 +2252,20 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
         stop = getTickCount();
         time = (double)(stop-start)/frequency;
         std::cout << "Time taken to process hook input constraints: " << time << std::endl;
+        stop = start;
+        std::cout << std::flush;
+    }
+    bool ax_pre_success = false;
+    if(needsAccessibility){
+        ax_pre_success = !this->getAccessibilityAnnotations(ax_annotations).empty();
+        if(!ax_pre_success){
+            std::stringstream msg;
+            msg << "Error during accessibilit events processing, aborting";
+            return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+        }
+        stop = getTickCount();
+        time = (double)(stop-start)/frequency;
+        std::cout << "Time taken to process accessibility constraints: " << time << std::endl;
         stop = start;
         std::cout << std::flush;
     }
@@ -2303,7 +2322,8 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
 
         /// Process hook input constraints
         if(needsHookEvents && !hi_pre_success){
-            bool hi_post_success = this->parseHookEvents(hook_txt,false);
+            this->hook_path = datapath + videostem + ".txt";
+            bool hi_post_success = !this->parseHookEvents(hook_path,inputhooks,false).empty();
             if(!hi_post_success){
                 std::stringstream msg;
                 msg << "Error during hook input processing, aborting";
@@ -2312,6 +2332,21 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
             stop = getTickCount();
             time = (double)(stop-start)/frequency;
             std::cout << "Time taken to process hook input constraints: " << time << std::endl;
+            stop = start;
+            std::cout << std::flush;
+        }
+
+        /// Process accessibility constraints
+        if(needsAccessibility && !ax_pre_success){
+            bool ax_post_success = !this->getAccessibilityAnnotations(ax_annotations).empty();
+            if(!ax_post_success){
+                std::stringstream msg;
+                msg << "Error during accessibility processing, aborting";
+                return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+            }
+            stop = getTickCount();
+            time = (double)(stop-start)/frequency;
+            std::cout << "Time taken to process accessibility constraints: " << time << std::endl;
             stop = start;
             std::cout << std::flush;
         }
@@ -3254,28 +3289,69 @@ bool InspectorWidgetProcessor::parseFirstMinuteFrameFile(PCP::CsvConfig* cv_csv)
     return false;
 }
 
-bool InspectorWidgetProcessor::checkHookEvents(std::ifstream& hook_txt){
-    hook_txt.seekg(ios::beg);
+bool InspectorWidgetProcessor::checkHookEvents(std::string hook_path){
+    std::ifstream hook_txt;
+    hook_txt.open(hook_path.c_str());
+    if(!hook_txt.is_open()){
+        std::stringstream msg;
+        msg <<  "Couldn't open hook input file " << hook_path;
+        return setStatusAndReturn(/*phase*/"checkHookEvents",/*error*/msg.str(), /*success*/"");
+    }
     std::string line;
     getline(hook_txt,line);
-    hook_txt.seekg(ios::beg);
     if(line.empty()){
+        std::stringstream msg;
+        msg <<  "Empty line in hook input file " << hook_path;
+        setStatusAndReturn(/*phase*/"checkHookEvents",/*error*/msg.str(), /*success*/"");
         return false;
     }
     std::string id("id=");
     size_t idpos = line.find(id);
     if(idpos == string::npos){
+        std::stringstream msg;
+        msg <<  "No id element in hook input file " << hook_path;
+        setStatusAndReturn(/*phase*/"checkHookEvents",/*error*/msg.str(), /*success*/"");
         return false;
     }
     std::string when("when=");
     size_t whenpos = line.find(when);
     if(whenpos == string::npos){
+        std::stringstream msg;
+        msg <<  "No timestamp element in hook input file " << hook_path;
+        setStatusAndReturn(/*phase*/"checkHookEvents",/*error*/msg.str(), /*success*/"");
         return false;
     }
+    hook_txt.close();
     return true;
 }
 
-bool InspectorWidgetProcessor::parseHookEvents(std::ifstream& hook_txt, bool using_clocktime){
+std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string hook_path, std::vector<std::string> names, bool using_clocktime){
+    std::vector<std::string> annotations;
+    std::ifstream hook_txt;
+    hook_txt.open(hook_path.c_str());
+    if(!hook_txt.is_open()){
+        std::stringstream msg;
+        msg <<  "Couldn't open hook input file " << hook_path;
+        setStatusAndReturn(/*phase*/"parseHookEvents",/*error*/msg.str(), /*success*/"");
+        return annotations;
+    }
+    if(!hook_txt.is_open()){
+        std::stringstream msg;
+        std::cerr <<  "Couldn't open hook input file " << hook_path;
+        setStatusAndReturn(/*phase*/"parseHookEvents",/*error*/msg.str(), /*success*/"");
+        return annotations;
+    }
+    hook_txt.seekg(ios::beg);
+
+    /// Check if names are listed in registered input hook definitions in the pipeline
+    for(std::vector<std::string>::iterator name = names.begin(); name != names.end();name++ ){
+        if( std::find(inputhooks.begin(), inputhooks.end(), *name) == inputhooks.end()){
+            std::stringstream msg;
+            std::cerr <<  *name << "is not part of registered input hook definitions in the pipeline, aborting";
+            setStatusAndReturn(/*phase*/"parseHookEvents",/*error*/msg.str(), /*success*/"");
+            return annotations;
+        }
+    }
 
     int stop;
     double time;
@@ -3288,18 +3364,18 @@ bool InspectorWidgetProcessor::parseHookEvents(std::ifstream& hook_txt, bool usi
     bool getWords = false;
     std::string wordshook("Words");
 
-    for(std::vector<std::string>::iterator inputhook = inputhooks.begin(); inputhook != inputhooks.end();inputhook++ ){
-        s_o[*inputhook] = StringBuffer();
-        s_s[*inputhook] = StringBuffer();
-        PrettyWriter<StringBuffer>* _o = new PrettyWriter<StringBuffer>(s_o[*inputhook]);
-        PrettyWriter<StringBuffer>* _s = new PrettyWriter<StringBuffer>(s_s[*inputhook]);
-        w_o[*inputhook] = _o;
-        w_s[*inputhook] = _s;
+    for(std::vector<std::string>::iterator name = names.begin(); name != names.end();name++ ){
+        s_o[*name] = StringBuffer();
+        s_s[*name] = StringBuffer();
+        PrettyWriter<StringBuffer>* _o = new PrettyWriter<StringBuffer>(s_o[*name]);
+        PrettyWriter<StringBuffer>* _s = new PrettyWriter<StringBuffer>(s_s[*name]);
+        w_o[*name] = _o;
+        w_s[*name] = _s;
         header(*_o);
         header(*_s);
-        if(inputhook_action[*inputhook] == "getWords"){
+        if(inputhook_action[*name] == "getWords"){
             getWords = true;
-            wordshook = *inputhook;
+            wordshook = *name;
         }
     }
 
@@ -3341,8 +3417,10 @@ bool InspectorWidgetProcessor::parseHookEvents(std::ifstream& hook_txt, bool usi
         for(std::vector<std::string>::iterator r = row.begin(); r != row.end(); r++){
             std::vector<std::string> col = splitconstraint(*r,'=');
             if(col.size()!=2){
-                std::cout << "Malformed file" << std::endl;
-                return false;
+                std::stringstream msg;
+                std::cerr << "Malformed hook events file";
+                setStatusAndReturn(/*phase*/"parseHookEvents",/*error*/msg.str(), /*success*/"");
+                return annotations;
             }
             val[col[0]] = col[1];
         }
@@ -3464,30 +3542,33 @@ bool InspectorWidgetProcessor::parseHookEvents(std::ifstream& hook_txt, bool usi
         r++;
     }
 
-    for(std::vector<std::string>::iterator inputhook = inputhooks.begin(); inputhook != inputhooks.end();inputhook++ ){
-        std::string label = *inputhook;
-        //overlayfooter(*w_o[*inputhook],label,wordout);
-        segmentfooter(*w_s[*inputhook],label,wordout,this->fps);
+    for(std::vector<std::string>::iterator name = names.begin(); name != names.end();name++ ){
+        std::string label = *name;
+        //overlayfooter(*w_o[*name],label,wordout);
+        segmentfooter(*w_s[*name],label,wordout,this->fps);
         std::ofstream segmentfile;
         std::string segmentfilepath = datapath + videostem + std::string("-") + label + std::string("-segments.json");
         segmentfile.open(segmentfilepath.c_str());
         if(segmentfile.is_open()){
-            segmentfile << s_s[*inputhook].GetString();
+            segmentfile << s_s[*name].GetString();
             segmentfile.close();
         }
-        delete(w_o[*inputhook]);
-        delete(w_s[*inputhook]);
+        annotations.push_back(s_s[*name].GetString());
+        delete(w_o[*name]);
+        delete(w_s[*name]);
     }
     s_o.clear();
     s_s.clear();
     w_o.clear();
     w_s.clear();
 
+    hook_txt.close();
+
     stop = getTickCount();
     time = (double)(stop-start)/frequency;
     std::cout << "Time taken to parse hook events and save jsons: " << time << std::endl;
 
-    return true;
+    return annotations;
 }
 
 std::string InspectorWidgetProcessor::getTemplateAnnotation(std::string name){
@@ -3533,8 +3614,6 @@ std::string InspectorWidgetProcessor::getTemplateAnnotation(std::string name){
     return _annotation;
 }
 
-
-
 float InspectorWidgetProcessor::getElapsedSeconds(float timestamp){
 
     struct tm _start_tm;
@@ -3559,10 +3638,79 @@ float InspectorWidgetProcessor::getElapsedSeconds(float timestamp){
     return _diff;
 }
 
-std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string name){
-    if(name != "focus_application" && name != "focus_window" && name != "pointed_widget" && name != "workspace_snapshot"){
-        this->setStatusAndReturn("accessibility", "Wrong accessibility annotation name", "");
-        return "";
+std::vector<std::string> InspectorWidgetProcessor::getAnnotations(std::vector<std::string> names){
+    std::vector<std::string> annotations;
+
+    std::vector<std::string> _templates;
+    std::vector<std::string> _ax_annotations;
+    std::vector<std::string> _inputhooks;
+
+    for(std::vector<std::string>::iterator name = names.begin();name!=names.end();name++){
+        std::vector<std::string>::iterator _template = std::find(template_list.begin(),template_list.end(),*name);
+        std::vector<std::string>::iterator _ax_annotation = std::find(ax_annotations.begin(),ax_annotations.end(),*name);
+        std::vector<std::string>::iterator _inputhook = std::find(inputhooks.begin(),inputhooks.end(),*name);
+        if(_template!=template_list.end()){
+            _templates.push_back(*name);
+        }
+        else if(_ax_annotation!=ax_annotations.end()){
+            _ax_annotations.push_back(*name);
+        }
+        else if(_inputhook!=inputhooks.end()){
+            _inputhooks.push_back(*name);
+        }
+        else{
+            std::stringstream msg;
+            msg << "Annotation " << *name << " is not defined";
+            setStatusAndReturn(/*phase*/"getAnnotations",/*error*/msg.str(), /*success*/"");
+            return annotations;
+        }
+    }
+
+    /// Empty names vector means return all available annotations
+    if(names.empty()){
+        for(std::vector<std::string>::iterator t = template_list.begin();t!=template_list.end();t++){
+            _templates.push_back(*t);
+        }
+        for(std::vector<std::string>::iterator a = ax_annotations.begin();a!=ax_annotations.end();a++){
+            _ax_annotations.push_back(*a);
+        }
+        for(std::vector<std::string>::iterator h = inputhooks.begin();h!=inputhooks.end();h++){
+            _inputhooks.push_back(*h);
+        }
+    }
+
+    for(std::vector<std::string>::iterator _template = _templates.begin();_template!=_templates.end();_template++){
+        std::string _annotation = this->getTemplateAnnotation(*_template);
+        if(!_annotation.empty()) annotations.push_back( _annotation );
+    }
+    for(std::vector<std::string>::iterator _ax_annotation = _ax_annotations.begin();_ax_annotation!=_ax_annotations.end();_ax_annotation++){
+        std::vector<std::string> _annotations = this->getAccessibilityAnnotations(_ax_annotations);
+        for(std::vector<std::string>::iterator _annotation = _annotations.begin(); _annotation != _annotations.end(); _annotation++){
+            if(!_annotation->empty())  annotations.push_back(*_annotation);
+        }
+    }
+    if(!_inputhooks.empty()){
+        this->hook_path = datapath + videostem + ".txt";
+        std::vector<std::string> _annotations = this->parseHookEvents(this->hook_path,_inputhooks,true);
+        for(std::vector<std::string>::iterator _annotation = _annotations.begin(); _annotation != _annotations.end(); _annotation++){
+            if(!_annotation->empty())  annotations.push_back(*_annotation);
+        }
+    }
+
+    return annotations;
+}
+
+std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(std::vector<std::string> names){
+    std::vector<std::string> annotations;
+
+    /// Check if names are listed in registered input hook definitions in the pipeline
+    for(std::vector<std::string>::iterator name = names.begin(); name != names.end();name++ ){
+        if( std::find(ax_annotations.begin(), ax_annotations.end(), *name) == ax_annotations.end()){
+            std::stringstream msg;
+            std::cerr <<  *name << "is not part of registered accessibility definitions in the pipeline, aborting";
+            setStatusAndReturn(/*phase*/"getAccessibilityAnnotations",/*error*/msg.str(), /*success*/"");
+            return annotations;
+        }
     }
 
     pugi::xml_document doc;
@@ -3589,14 +3737,14 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
         std::stringstream msg;
         msg << "Could not parse accessibility XML file "<< axFile << std::endl;
         this->setStatusAndReturn("accessibility", msg.str(), "");
-        return "";
+        return annotations;
     }
 
     if(result.status != pugi::status_ok){
         std::stringstream msg;
         msg << "Could not properly load XML file "<< axFile << std::endl;
         this->setStatusAndReturn("accessibility", msg.str(), "");
-        return "";
+        return annotations;
     }
 
     pugi::xml_node fc = doc.first_child();
@@ -3604,7 +3752,7 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
         std::stringstream msg;
         msg << "XML file "<< axFile << " is empty, aborting." << std::endl;
         this->setStatusAndReturn("accessibility", msg.str(), "");
-        return "";
+        return annotations;
     }
 
     pugi::xml_node root = doc.child("root");
@@ -3612,31 +3760,57 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
         std::stringstream msg;
         msg << "XML document doesn't contain a root element" << std::endl;
         this->setStatusAndReturn("accessibility", msg.str(), "");
-        return "";
+        return annotations;
     }
 
-    std::string jsonSuffix("");
+    int stop;
+    double time;
+    int start = getTickCount();
+    double frequency = getTickFrequency();
 
-    if(name == "focus_application"){
-        jsonSuffix = "AXFocusApplication";
+    std::map<std::string,StringBuffer> s_o,s_s;
+    std::map<std::string,PrettyWriter<StringBuffer>* > w_o,w_s;
+
+    bool getFocusApplication = false;
+    std::string getFocusApplicationAnnotation("");
+    bool getFocusWindow = false;
+    std::string getFocusWindowAnnotation("");
+    bool getPointedWidget = false;
+    std::string getPointedWidgetAnnotation("");
+    bool getWorkspaceSnapshot = false;
+    std::string getWorkspaceSnapshotAnnotation("");
+
+    for(std::vector<std::string>::iterator name = names.begin(); name != names.end();name++ ){
+        s_o[*name] = StringBuffer();
+        s_s[*name] = StringBuffer();
+        PrettyWriter<StringBuffer>* _o = new PrettyWriter<StringBuffer>(s_o[*name]);
+        PrettyWriter<StringBuffer>* _s = new PrettyWriter<StringBuffer>(s_s[*name]);
+        w_o[*name] = _o;
+        w_s[*name] = _s;
+        header(*_o);
+        header(*_s);
+
+        if(ax_action[*name] == "getFocusApplication"){
+            getFocusApplication = true;
+            getFocusApplicationAnnotation = *name;
+        }
+        else if(ax_action[*name] == "getFocusWindow"){
+            getFocusWindow = true;
+            getFocusWindowAnnotation = *name;
+        }
+        else if(ax_action[*name] == "getPointedWidget"){
+            getPointedWidget = true;
+            getPointedWidgetAnnotation = *name;
+        }
+        else if(ax_action[*name] == "getWorkspaceSnapshot"){
+            getWorkspaceSnapshot = true;
+            getWorkspaceSnapshotAnnotation = *name;
+        }
     }
-    else if(name == "focus_window"){
-        jsonSuffix = "AXFocusWindow";
-    }
-    else if(name == "pointed_widget"){
-        jsonSuffix = "AXPointedWidget";
-    }
-    else if(name == "workspace_snapshot"){
-        jsonSuffix = "AXWorkspaceSnapshot";
-    }
 
-    StringBuffer ax_s;
+    // AXFocusApplication=getFocusApplication(); AXFocusWindow=getFocusWindow(); AXPointedWidget=getPointedWidget(); AXWorkspaceSnapshot=getWorkspaceSnapshot();
 
-    PrettyWriter<StringBuffer>* ax_w = new PrettyWriter<StringBuffer>(ax_s);
-
-    header(*ax_w);
-
-    if(name == "focus_application"){
+    if(getFocusApplication){
 
         std::string _name("");
 
@@ -3650,12 +3824,12 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
             if(_clock > this->start_clock && _clock < this->end_clock){
                 _name = n.attribute("name").as_string();
                 double _event_t = double(_clock - this->start_clock )/1000000000.0;
-                event(*ax_w, _event_t*this->fps,this->fps, _name );
+                event(*w_s[getFocusApplicationAnnotation], _event_t*this->fps,this->fps, _name );
             }
         }
-        eventfooter(*ax_w, jsonSuffix,this->video_frames, this->fps);
+        eventfooter(*w_s[getFocusApplicationAnnotation], getFocusApplicationAnnotation,this->video_frames, this->fps);
     }
-    else if(name == "focus_window"){
+    if(getFocusWindow){
         uint64_t _last_clock = 0;
         std::string _title("");
         for (pugi::xml_node n: root.children("windowEvent"))
@@ -3672,14 +3846,14 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
                     _title = t.attribute("title").as_string();
                     double _event_t = double(_clock - this->start_clock )/1000000000.0;
                     //std::cout << "focus '" << t.attribute("title").as_string() << "':'" << t.attribute("app").as_string() << "' ";
-                    event(*ax_w, _event_t*this->fps, this->fps, _title );
+                    event(*w_s[getFocusWindowAnnotation], _event_t*this->fps, this->fps, _title );
                 }
                 _last_clock = _clock;
             }
         }
-        eventfooter(*ax_w, jsonSuffix,this->video_frames, this->fps);
+        eventfooter(*w_s[getFocusWindowAnnotation], getFocusWindowAnnotation,this->video_frames, this->fps);
     }
-    else if(name == "pointed_widget"){
+    if(getPointedWidget){
         std::string _name("");
         for (pugi::xml_node n: root.children("mouse"))
         {
@@ -3704,13 +3878,12 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
                 catch(...){
                     std::cout << "Bad xpath" << std::endl;
                 }
-                event(*ax_w, _event_t*this->fps, this->fps, _name );
+                event(*w_s[getPointedWidgetAnnotation], _event_t*this->fps, this->fps, _name );
             }
         }
-        eventfooter(*ax_w, jsonSuffix,this->video_frames, this->fps);
+        eventfooter(*w_s[getPointedWidgetAnnotation], getPointedWidgetAnnotation,this->video_frames, this->fps);
     }
-    else if(name == "workspace_snapshot"){
-        std::string _name("AXWorkspaceSnapshot");
+    if(getWorkspaceSnapshot){
         for (pugi::xml_node n: root.children("application"))
         {
             uint64_t _clock = n.attribute("clock").as_llong();
@@ -3721,22 +3894,35 @@ std::string InspectorWidgetProcessor::getAccessibilityAnnotation(std::string nam
             if(_clock > this->start_clock && _clock < this->end_clock){
                 double _event_t = double(_clock - this->start_clock )/1000000000.0;
                 //std::cout << "application";
-                event(*ax_w, _event_t*this->fps, this->fps, _name );
+                event(*w_s[getWorkspaceSnapshotAnnotation], _event_t*this->fps, this->fps, getWorkspaceSnapshotAnnotation );
             }
         }
-        eventfooter(*ax_w, jsonSuffix,this->video_frames, this->fps);
+        eventfooter(*w_s[getWorkspaceSnapshotAnnotation], getWorkspaceSnapshotAnnotation,this->video_frames, this->fps);
     }
 
-    std::ofstream ax_f;
-    std::string ax_fp = datapath + videostem + "-" + jsonSuffix + ".json";
-    ax_f.open(ax_fp.c_str());
-
-    if(ax_f.is_open()){
-        ax_f << ax_s.GetString();
-        ax_f.close();
+    for(std::vector<std::string>::iterator name = names.begin(); name != names.end();name++ ){
+        std::string label = *name;
+        std::ofstream segmentfile;
+        std::string segmentfilepath = datapath + videostem + std::string("-") + label + std::string("-events.json");
+        segmentfile.open(segmentfilepath.c_str());
+        if(segmentfile.is_open()){
+            segmentfile << s_s[*name].GetString();
+            segmentfile.close();
+        }
+        annotations.push_back(s_s[*name].GetString());
+        delete(w_o[*name]);
+        delete(w_s[*name]);
     }
+    s_o.clear();
+    s_s.clear();
+    w_o.clear();
+    w_s.clear();
 
-    return ax_s.GetString();
+    stop = getTickCount();
+    time = (double)(stop-start)/frequency;
+    std::cout << "Time taken to get accessibility annotations and save jsons: " << time << std::endl;
+
+    return annotations;
 }
 
 std::vector<float> InspectorWidgetProcessor::getAccessibilityUnderMouse(float _time, float x, float y){
