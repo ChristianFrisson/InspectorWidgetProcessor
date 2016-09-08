@@ -302,7 +302,7 @@ void overlay(PrettyWriter<StringBuffer>& writer, float in, float out, float fps,
 
 }
 
-void eventfooter(PrettyWriter<StringBuffer>& writer, std::string id, float out, float fps){
+void eventfooter(PrettyWriter<StringBuffer>& writer, std::string id, std::string source, float out, float fps){
     writer.EndArray();
     writer.EndObject();
 
@@ -327,6 +327,8 @@ void eventfooter(PrettyWriter<StringBuffer>& writer, std::string id, float out, 
     writer.String("InspectorWidget Events");
     writer.String("processor");
     writer.String("InspectorWidget Processor");
+    writer.String("source");
+    writer.String(source.c_str());
     writer.String("processed");
     writer.Uint64(11421141589286);
     writer.String("version");
@@ -336,7 +338,7 @@ void eventfooter(PrettyWriter<StringBuffer>& writer, std::string id, float out, 
 
 }
 
-void segmentfooter(PrettyWriter<StringBuffer>& writer, std::string id, float out, float fps){
+void segmentfooter(PrettyWriter<StringBuffer>& writer, std::string id, std::string source, float out, float fps){
     writer.EndArray();
     writer.EndObject();
 
@@ -361,6 +363,8 @@ void segmentfooter(PrettyWriter<StringBuffer>& writer, std::string id, float out
     writer.String("InspectorWidget Segments");
     writer.String("processor");
     writer.String("InspectorWidget Processor");
+    writer.String("source");
+    writer.String(source.c_str());
     writer.String("processed");
     writer.Uint64(11421141589286);
     writer.String("version");
@@ -370,7 +374,7 @@ void segmentfooter(PrettyWriter<StringBuffer>& writer, std::string id, float out
 
 }
 
-void overlayfooter(PrettyWriter<StringBuffer>& writer, std::string id, float out, float fps){
+void overlayfooter(PrettyWriter<StringBuffer>& writer, std::string id, std::string source, float out, float fps){
     writer.EndArray();
     writer.EndObject();
 
@@ -395,8 +399,10 @@ void overlayfooter(PrettyWriter<StringBuffer>& writer, std::string id, float out
     writer.String("InspectorWidget Overlays");
     writer.String("processor");
     writer.String("InspectorWidget Processor");
-    writer.String("processed");
+    writer.String("source");
+    writer.String(source.c_str());
     writer.Uint64(11421141589286);
+    writer.String("processed");
     writer.String("version");
     writer.Double(1);
 
@@ -3059,7 +3065,7 @@ bool InspectorWidgetProcessor::applyFilterings(){
                 log_y[*filter] = _y;
                 log_val[*filter] = _val;
 
-                segmentfooter(*w_s,*filter,this->video_frames, this->fps);
+                segmentfooter(*w_s,*filter,"combined",this->video_frames, this->fps);
 
                 std::ofstream segmentfile;
                 std::string segmentfilepath = datapath + videostem + std::string("-") + *filter + std::string("-segments.json");
@@ -3174,7 +3180,7 @@ bool InspectorWidgetProcessor::applyFilterings(){
                 if(isVarFloat) log_val[*filter] = _val;
                 if(isVarTxt) log_txt[*filter] = _txt;
 
-                segmentfooter(*w_s,*filter,video_frames, this->fps);
+                segmentfooter(*w_s,*filter,"combined",video_frames, this->fps);
 
                 std::ofstream segmentfile;
                 std::string segmentfilepath = datapath + videostem + std::string("-") + *filter + std::string("-segments.json");
@@ -3251,7 +3257,7 @@ bool InspectorWidgetProcessor::applyFilterings(){
                 log_y[*filter] = _y;
                 log_val[*filter] = _val;
 
-                segmentfooter(*w_s,*filter,this->video_frames, this->fps);
+                segmentfooter(*w_s,*filter,"combined",this->video_frames, this->fps);
 
                 std::ofstream segmentfile;
                 std::string segmentfilepath = datapath + videostem + std::string("-") + *filter + std::string("-segments.json");
@@ -3615,11 +3621,11 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                 || (isActionActive["getModifierKeysPressed"] && annotationName["getModifierKeysPressed"] == *name)
                 ){
             segmentfilepath = datapath + videostem + std::string("-") + label + std::string("-events.json");
-            eventfooter(*w_s[*name],label,this->video_frames,this->fps);
+            eventfooter(*w_s[*name],"input_events",label,this->video_frames,this->fps);
         }
         else if( (isActionActive["getWords"] && annotationName["getWords"] == *name) ){
             segmentfilepath = datapath + videostem + std::string("-") + label + std::string("-segments.json");
-            segmentfooter(*w_s[*name],label,this->video_frames,this->fps);
+            segmentfooter(*w_s[*name],label,"input_events",this->video_frames,this->fps);
         }
 
         segmentfile.open(segmentfilepath.c_str());
@@ -3678,7 +3684,7 @@ std::string InspectorWidgetProcessor::getTemplateAnnotation(std::string name){
         if(_val == 1){
             segment(*w_s, _in, f, this->fps, name);
         }
-        segmentfooter(*w_s, name, f, this->fps);
+        segmentfooter(*w_s, name,"computer_vision", f, this->fps);
 
         _annotation = s_s.GetString();
 
@@ -3899,7 +3905,7 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
                 event(*w_s[getFocusApplicationAnnotation], _event_t*this->fps,this->fps, _name );
             }
         }
-        eventfooter(*w_s[getFocusApplicationAnnotation], getFocusApplicationAnnotation,this->video_frames, this->fps);
+        eventfooter(*w_s[getFocusApplicationAnnotation], getFocusApplicationAnnotation,"accessibility", this->video_frames, this->fps);
     }
     if(getFocusWindow){
         uint64_t _last_clock = 0;
@@ -3923,7 +3929,7 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
                 _last_clock = _clock;
             }
         }
-        eventfooter(*w_s[getFocusWindowAnnotation], getFocusWindowAnnotation,this->video_frames, this->fps);
+        eventfooter(*w_s[getFocusWindowAnnotation], getFocusWindowAnnotation, "accessibility", this->video_frames, this->fps);
     }
     if(getPointedWidget){
         std::string _name("");
@@ -3953,7 +3959,7 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
                 event(*w_s[getPointedWidgetAnnotation], _event_t*this->fps, this->fps, _name );
             }
         }
-        eventfooter(*w_s[getPointedWidgetAnnotation], getPointedWidgetAnnotation,this->video_frames, this->fps);
+        eventfooter(*w_s[getPointedWidgetAnnotation], getPointedWidgetAnnotation,"accessibility",this->video_frames, this->fps);
     }
     if(getWorkspaceSnapshot){
         for (pugi::xml_node n: root.children("application"))
@@ -3969,7 +3975,7 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
                 event(*w_s[getWorkspaceSnapshotAnnotation], _event_t*this->fps, this->fps, getWorkspaceSnapshotAnnotation );
             }
         }
-        eventfooter(*w_s[getWorkspaceSnapshotAnnotation], getWorkspaceSnapshotAnnotation,this->video_frames, this->fps);
+        eventfooter(*w_s[getWorkspaceSnapshotAnnotation], getWorkspaceSnapshotAnnotation,"accessibility",this->video_frames, this->fps);
     }
 
     for(std::vector<std::string>::iterator name = names.begin(); name != names.end();name++ ){
@@ -4491,8 +4497,8 @@ bool InspectorWidgetProcessor::parseComputerVisionEvents(PCP::CsvConfig* cv_csv)
 
     for(size_t i = 0; i < annotations; ++i){
 
-        overlayfooter(*(w_o[i]), label[i], f, this->fps);
-        segmentfooter(*(w_s[i]), label[i], f, this->fps);
+        overlayfooter(*(w_o[i]), label[i], "computer_vision",f, this->fps);
+        segmentfooter(*(w_s[i]), label[i], "computer_vision",f, this->fps);
 
         //std::cout << s_o[i].GetString() << endl;
         std::cout << std::endl;
