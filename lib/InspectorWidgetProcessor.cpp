@@ -14,8 +14,46 @@ using namespace rapidjson;
 using namespace std;
 using namespace cv;
 
-bool canformword(int keycodeint){
+std::string modifierString(int keycodeint){
+    std::string  modifier_string = "";
+    switch(keycodeint){
+    // Begin Modifier and Control Keys
+    case VC_SHIFT_L: //0x002A
+        modifier_string = "Shift (Left)";
+        break;
+    case VC_SHIFT_R: //0x0036
+        modifier_string = "Shift (Right)";
+        break;
+    case VC_CONTROL_L: //0x001D
+        modifier_string = "Ctrl (Left)";
+        break;
+    case VC_CONTROL_R: //0x0E1D
+        modifier_string = "Ctrl (Right)";
+        break;
+    case VC_ALT_L: //0x0038	// Option or Alt Key
+        modifier_string = "Alt (Left)";
+        break;
+    case VC_ALT_R: //0x0E38	// Option or Alt Key
+        modifier_string = "Alt (Right)";
+        break;
+    case VC_META_L: //0x0E5B	// Windows or Command Key
+        modifier_string = "Meta (Left)";
+        break;
+    case VC_META_R: //0x0E5C	// Windows or Command Key
+        modifier_string = "Meta (Right)";
+        break;
+    case VC_CONTEXT_MENU: //0x0E5D
+        modifier_string = "Context Menu";
+        break;
+        // End Modifier and Control Keys
+    default:
+        modifier_string = "";
+        break;
+    }
+    return modifier_string;
+}
 
+bool canformword(int keycodeint){
     bool _canformword = false;
     switch(keycodeint){
     // Begin Alphanumeric Zone
@@ -447,10 +485,11 @@ InspectorWidgetProcessor::InspectorWidgetProcessor(){
     supported_input_hook_tests.push_back(""); // make test statements optional
 
     supported_input_hook_actions.push_back("getWords");
-    //supported_input_hook_actions.push_back("getPointerClicks");
-    //supported_input_hook_actions.push_back("getKeysPressed");
-    //supported_input_hook_actions.push_back("getModifierCombosPressed");
+    supported_input_hook_actions.push_back("getPointerClicks");
+    supported_input_hook_actions.push_back("getKeysTyped");
+    supported_input_hook_actions.push_back("getModifierKeysPressed");
     //supported_input_hook_actions.push_back("matchKey");
+    //supported_input_hook_actions.push_back("getInputInactivity"); // with user-definable temporal threshold
 }
 
 void InspectorWidgetProcessor::clear(){
@@ -3353,6 +3392,14 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
         }
     }
 
+    /// Initialze maps of active actions and their related annotation name
+    std::map<std::string,bool> isActionActive;
+    std::map<std::string,std::string> annotationName;
+    for(std::vector<std::string>::iterator action = inputhooks.begin(); action != inputhooks.end();action++ ){
+        isActionActive[*action] = false;
+        annotationName[*action] = "";
+    }
+
     int stop;
     double time;
     int start = getTickCount();
@@ -3360,9 +3407,6 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
 
     std::map<std::string,StringBuffer> s_o,s_s;
     std::map<std::string,PrettyWriter<StringBuffer>* > w_o,w_s;
-
-    bool getWords = false;
-    std::string wordshook("Words");
 
     for(std::vector<std::string>::iterator name = names.begin(); name != names.end();name++ ){
         s_o[*name] = StringBuffer();
@@ -3373,10 +3417,9 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
         w_s[*name] = _s;
         header(*_o);
         header(*_s);
-        if(inputhook_action[*name] == "getWords"){
-            getWords = true;
-            wordshook = *name;
-        }
+        std::string action = inputhook_action[*name];
+        isActionActive[action] = true;
+        annotationName[action] = *name;
     }
 
     // parse & print body lines
@@ -3407,6 +3450,7 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
     std::vector<float> _x,_y;
     std::vector<std::string> _words;
     bool keycode_canformword = false;
+    std::string keycode_modifier_string = "";
     bool keychar_canformword = false;
 
     int _frame = 0;
@@ -3454,8 +3498,8 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                     std::map<std::string,std::string>::iterator rawcode_it = val.find("rawcode");
                     std::map<std::string,std::string>::iterator x_it = val.find("x");
                     std::map<std::string,std::string>::iterator y_it = val.find("y");
-                    //std::map<std::string,std::string>::iterator button_it = val.find("button");
-                    //std::map<std::string,std::string>::iterator clicks_it = val.find("clicks");
+                    std::map<std::string,std::string>::iterator button_it = val.find("button");
+                    std::map<std::string,std::string>::iterator clicks_it = val.find("clicks");
                     if(keycode_it != val.end() || keychar_it != val.end()){
                         cur_event_is_keyboard = true;
                         if( keychar_it != val.end() ){
@@ -3463,11 +3507,18 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                             keychar_int = atoi(keychar_str.c_str());
                             keychar_time = ts_now;
                             keychar_canformword = canformword(keychar_str);
+                            if(isActionActive["getKeysTyped"]){
+                                event(*w_s[annotationName["getKeysTyped"]], (ts_now - ts_start)*fps , this->fps, keychar_str);
+                            }
                         }
                         if( keycode_it != val.end()  ){
                             keycode_int = atoi(keycode_it->second.c_str());
                             keycode_time = ts_now;
                             keycode_canformword = canformword(keycode_int);
+                            keycode_modifier_string = modifierString(keycode_int);
+                            if(!keycode_modifier_string.empty() && isActionActive["getModifierKeysPressed"]){
+                                event(*w_s[annotationName["getModifierKeysPressed"]], (ts_now - ts_start)*fps , this->fps, keycode_modifier_string);
+                            }
                         }
                         if( rawcode_it != val.end()  ){
                             std::string rawcode_str = rawcode_it->second;
@@ -3497,6 +3548,15 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                         cur_event_is_mouse = true;
                         __x = atof(x_it->second.c_str());
                         __y = atof(x_it->second.c_str());
+
+                    }
+                    if(clicks_it != val.end() && button_it != val.end()){
+                        cur_event_is_mouse = true;
+                        bool clicked = (clicks_it->second == "1");
+                        std::string button = "Button: "+ button_it->second;
+                        if(clicked && isActionActive["getPointerClicks"]){
+                            event(*w_s[annotationName["getPointerClicks"]], (ts_now - ts_start)*fps , this->fps, button);
+                        }
                     }
 
                     if( (prev_event_is_keyboard && !cur_event_is_keyboard) || (cur_event_is_keyboard && !keychar_canformword/*!keycode_canformword*/ ) ){
@@ -3521,8 +3581,8 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                                 _frame++;
                             }
 
-                            if(getWords){
-                                segment(*w_s[wordshook], wordin, wordout, this->fps, word);
+                            if(isActionActive["getWords"]){
+                                segment(*w_s[annotationName["getWords"]], wordin, wordout, this->fps, word);
                                 //overlay(*w_o[wordshook], wordin, wordout, this->fps, __x/(float)video_w, __y/(float)video_h, 20/(float)video_w, 20/(float)video_h, word);
                                 //std::cout << "word '" << word << "' @ " << wordin << " " << wordout << std::endl;
                             }
@@ -3531,6 +3591,7 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
 
                         keychar_canformword = false;
                         keycode_canformword = false;
+                        keycode_modifier_string = "";
                     }
 
                     prev_event_is_mouse = cur_event_is_mouse;
@@ -3545,9 +3606,22 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
     for(std::vector<std::string>::iterator name = names.begin(); name != names.end();name++ ){
         std::string label = *name;
         //overlayfooter(*w_o[*name],label,wordout);
-        segmentfooter(*w_s[*name],label,wordout,this->fps);
+
         std::ofstream segmentfile;
-        std::string segmentfilepath = datapath + videostem + std::string("-") + label + std::string("-segments.json");
+        std::string segmentfilepath;
+
+        if( (isActionActive["getPointerClicks"] && annotationName["getPointerClicks"] == *name)
+                || (isActionActive["getKeysTyped"] && annotationName["getKeysTyped"] == *name)
+                || (isActionActive["getModifierKeysPressed"] && annotationName["getModifierKeysPressed"] == *name)
+                ){
+            segmentfilepath = datapath + videostem + std::string("-") + label + std::string("-events.json");
+            eventfooter(*w_s[*name],label,this->video_frames,this->fps);
+        }
+        else if( (isActionActive["getWords"] && annotationName["getWords"] == *name) ){
+            segmentfilepath = datapath + videostem + std::string("-") + label + std::string("-segments.json");
+            segmentfooter(*w_s[*name],label,this->video_frames,this->fps);
+        }
+
         segmentfile.open(segmentfilepath.c_str());
         if(segmentfile.is_open()){
             segmentfile << s_s[*name].GetString();
@@ -3807,8 +3881,6 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
             getWorkspaceSnapshotAnnotation = *name;
         }
     }
-
-    // AXFocusApplication=getFocusApplication(); AXFocusWindow=getFocusWindow(); AXPointedWidget=getPointedWidget(); AXWorkspaceSnapshot=getWorkspaceSnapshot();
 
     if(getFocusApplication){
 
