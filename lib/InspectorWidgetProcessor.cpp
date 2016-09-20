@@ -589,6 +589,18 @@ void InspectorWidgetProcessor::clear(){
     ax_deps.clear();
     ax_action.clear();
     ax_variables.clear();
+
+    ax_hover_time = -1;
+    ax_hover_x = -1; /// check with dual monitors
+    ax_hover_y = -1; /// check with dual monitors
+    ax_hover_rect.clear();
+    ax_hover_tree_children = "";
+    ax_hover_tree_parents = "";
+    /*ax_hover_root = pugi::xml_node();
+    ax_hover_root_parsed = false;
+    ax_hover_closest_node = pugi::xml_node();
+    ax_hover_closest_window_node = pugi::xml_node();
+    ax_hover_closest_parsed = false;*/
 }
 
 InspectorWidgetProcessor::~InspectorWidgetProcessor(){
@@ -1400,7 +1412,17 @@ bool InspectorWidgetProcessor::init( int argc, char** argv ){
 } 
 
 bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
-    this->clear();
+
+    std::string _videostem;
+    _videostem = getStemName(argv[1]);
+    std::size_t underpos = _videostem.find_first_of("_");
+    if(underpos!=std::string::npos)
+        _videostem = _videostem.substr(0,underpos);
+    if(videostem != _videostem){
+        this->clear();
+    }
+    videostem = _videostem;
+
     status_phase = "init";
     status_progress = 0;
     active = true;
@@ -1419,11 +1441,6 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
     std::size_t slashpos = datapath.find_last_of(slash);
     if(slashpos!=datapath.size()-1)
         datapath += slash;
-
-    videostem = getStemName(argv[1]);
-    std::size_t underpos = videostem.find_first_of("_");
-    if(underpos!=std::string::npos)
-        videostem = videostem.substr(0,underpos);
 
     std::string videopath = datapath + videostem + ".mp4";
     std::cout << "datapath " << datapath << std::endl;
@@ -3988,8 +4005,16 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
             segmentfile.close();
         }
         annotations.push_back(s_s[*name].GetString());
-        delete(w_o[*name]);
-        delete(w_s[*name]);
+    }
+    for(std::map<std::string,PrettyWriter<StringBuffer>* >::iterator _s = w_s.begin(); _s != w_s.end(); _s++){
+        if(_s->second){
+            delete _s->second;
+        }
+    }
+    for(std::map<std::string,PrettyWriter<StringBuffer>* >::iterator _o = w_o.begin(); _o != w_o.end(); _o++){
+        if(_o->second){
+            delete _o->second;
+        }
     }
     s_o.clear();
     s_s.clear();
@@ -4003,18 +4028,35 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
     return annotations;
 }
 
-std::vector<float> InspectorWidgetProcessor::getAccessibilityUnderMouse(float _time, float x, float y){
-
+InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibilityHover(float _time, float _x, float _y){
+    InspectorWidgetAccessibilityHoverInfo info;
     std::vector<float> rect(4,0.0);
+    std::string axTreeChildren,axTreeParents;
+    std::string axTreeIndent(" ");
+    const unsigned int axTreeFormat = pugi::format_indent | pugi::format_no_declaration | pugi::format_save_file_text;
+    pugi::xml_encoding axTreeEncoding = pugi::encoding_auto;
+    int axTreeDepth = 0;
 
     uint64_t time = this->start_clock + _time*1000000000;
 
+    if(ax_hover_x ==_x && ax_hover_y ==_y && ax_hover_time ==_time && !ax_hover_tree_children.empty() && !ax_hover_tree_parents.empty()){
+        info.xml_tree_children = ax_hover_tree_children;
+        info.xml_tree_parents = ax_hover_tree_parents;
+        info.rect = ax_hover_rect;
+        return info;
+    }
+
+    pugi::xml_node ax_hover_root;
+    bool ax_hover_root_parsed;
+    pugi::xml_node ax_hover_closest_node;
+    pugi::xml_node ax_hover_closest_window_node;
+
+    /// Parse the XML tree (if not yet done)
+    //if(!ax_hover_root_parsed){
+
     pugi::xml_document doc;
-
     std::string axFile = datapath + videostem + ".xml";
-
     std::ifstream iss( axFile );
-
     //iss.exceptions(std::ios::eofbit | std::ios::badbit | std::ios::failbit);
 
     // Windows has newline translation for text-mode files, so reading from this stream reaches eof and sets fail|eof bits.
@@ -4033,14 +4075,14 @@ std::vector<float> InspectorWidgetProcessor::getAccessibilityUnderMouse(float _t
         std::stringstream msg;
         msg << "Could not parse accessibility XML file "<< axFile << std::endl;
         this->setStatusAndReturn("accessibility", msg.str(), "");
-        return rect;
+        return info;
     }
 
     if(result.status != pugi::status_ok){
         std::stringstream msg;
         msg << "Could not properly load XML file "<< axFile << std::endl;
         this->setStatusAndReturn("accessibility", msg.str(), "");
-        return rect;
+        return info;
     }
 
     pugi::xml_node fc = doc.first_child();
@@ -4048,23 +4090,28 @@ std::vector<float> InspectorWidgetProcessor::getAccessibilityUnderMouse(float _t
         std::stringstream msg;
         msg << "XML file "<< axFile << " is empty, aborting." << std::endl;
         this->setStatusAndReturn("accessibility", msg.str(), "");
-        return rect;
+        return info;
     }
 
-    pugi::xml_node root = doc.child("root");
-    if(root.empty()){
+    ax_hover_root = doc.child("root");
+    if(ax_hover_root.empty()){
         std::stringstream msg;
         msg << "XML document doesn't contain a root element" << std::endl;
         this->setStatusAndReturn("accessibility", msg.str(), "");
-        return rect;
+        return info;
     }
+    ax_hover_root_parsed = true;
+    //}
 
     /// Find the closest node before time
-    pugi::xml_node closest_node;
+    pugi::xml_node closest_node;// = ax_hover_closest_node;
+    pugi::xml_node closest_window_node;// = ax_hover_closest_window_node;
+    uint64_t closest_window_node_clock = 0;
+    //if( ax_hover_time != _time || closest_node.empty() || closest_window_node.empty()){
     pugi::xml_node _prev_node;
     uint64_t _prev_clock = this->start_clock;
-    //for (pugi::xml_node n = root.last_child(); !n.empty(); n = n.previous_sibling())
-    for (pugi::xml_node n: root.children())
+    //for (pugi::xml_node n = ax_hover_root.last_child(); !n.empty(); n = n.previous_sibling())
+    for (pugi::xml_node n: ax_hover_root.children())
     {
         uint64_t _clock = n.attribute("clock").as_llong();
         //std::cout  << "prev=" << _prev_clock   << " time=" << time  << " next=" << _clock << " start="<< this->start_clock << " end="<< this->end_clock << " name=" << n.name() << std::endl;
@@ -4081,15 +4128,15 @@ std::vector<float> InspectorWidgetProcessor::getAccessibilityUnderMouse(float _t
         std::stringstream msg;
         msg << "Could not match the closest XML element before the desired time" << std::endl;
         this->setStatusAndReturn("accessibility", msg.str(), "");
-        return rect;
+        return info;
     }
 
     /// Find the closest preceeding windowEvent node before the closest node before time
-    pugi::xml_node closest_window_node;
     for (pugi::xml_node n = closest_node; !n.empty(); n = n.previous_sibling()){
         //std::cout << "name=" << n.name() << std::endl;
-        if(std::string(n.name()) == "windowEvent"){
+        if(std::string(n.name()) == "windowEvent" && !n.child("allWindows").empty()){
             closest_window_node = n;
+            closest_window_node_clock = n.attribute("clock").as_llong();
             break;
         }
     }
@@ -4098,135 +4145,224 @@ std::vector<float> InspectorWidgetProcessor::getAccessibilityUnderMouse(float _t
         std::stringstream msg;
         msg << "Could not match the closest windowEvent XML element before the desired time" << std::endl;
         this->setStatusAndReturn("accessibility", msg.str(), "");
-        return rect;
+        return info;
     }
+    ax_hover_closest_node = closest_node;
+    ax_hover_closest_window_node = closest_window_node;
+    //}
+    ax_hover_time = _time;
 
     /// List all windows that contain x and y
-    for (pugi::xml_node n: closest_window_node.child("allWindows").children("window")){
-        float wx = n.attribute("x").as_float();
-        float wy = n.attribute("y").as_float();
-        float ww = n.attribute("w").as_float();
-        float wh = n.attribute("h").as_float();
-        float wl = wx/float(this->video_w);
-        float wr = (wx+ww)/float(this->video_w);
-        float wt = wy/float(this->video_h);
-        float wb = (wy+wh)/float(this->video_h);
+    std::string windowTitle;
+    pugi::xml_node allWindows;
 
-        //        std::cout << "@ " << closest_window_node.attribute("clock").as_llong();
-        //        std::cout << " window " << n.attribute("app").as_string() << ":" << n.attribute("title").as_string() ;
-        //        std::cout << " wl=" << wl << " wr=" << wr << " wt=" << wt << " wb=" << wb << " ";
-        //        std::cout << " x=" << x << " y=" << y;
+    if( !(ax_hover_x==_x && ax_hover_y==_y) && !closest_node.empty() /*&& !closest_window_node.empty()*/ ){
+        allWindows = closest_window_node.child("allWindows");
+        //if(!allWindows.empty()){
+        for (pugi::xml_node n: closest_window_node.child("allWindows").children("window")){
+            float wx = n.attribute("x").as_float();
+            float wy = n.attribute("y").as_float();
+            float ww = n.attribute("w").as_float();
+            float wh = n.attribute("h").as_float();
+            float wl = wx/float(this->video_w);
+            float wr = (wx+ww)/float(this->video_w);
+            float wt = wy/float(this->video_h);
+            float wb = (wy+wh)/float(this->video_h);
 
-        if( wl < x && x < wr && wt < y && y < wb){
-            /// For each window that contains x and y, find the closest preceeding application node, parse to find the appropriate widget
-            //            std::cout << " matches ";
+            //        std::cout << "@ " << closest_window_node.attribute("clock").as_llong();
+            //        std::cout << " window " << n.attribute("app").as_string() << ":" << n.attribute("title").as_string() ;
+            //        std::cout << " wl=" << wl << " wr=" << wr << " wt=" << wt << " wb=" << wb << " ";
+            //        std::cout << " x=" << x << " y=" << y;
 
-            /// Use window dimensions
-            rect[0] = wl;
-            rect[1] = wt;
-            rect[2] = wr-wl;
-            rect[3] = wb-wt;
-            //return rect;
+            if( wl <= _x && _x <= wr && wt <= _y && _y <= wb){
+                /// For each window that contains x and y, find the closest preceeding application node, parse to find the appropriate widget
+                //            std::cout << " matches ";
 
-            /// Find the closest preceeding application node
-            for (pugi::xml_node t = closest_node; !t.empty(); t = t.previous_sibling()){
-                if(std::string(t.name()) == "application"){
-                    std::string query = std::string("./AXApplication/AXWindow[@AXTitle='") + n.attribute("title").as_string() + "']";
-                    pugi::xpath_node tpath = t.select_single_node(query.c_str());
+                /// Use window dimensions
+                rect[0] = wl;
+                rect[1] = wt;
+                rect[2] = wr-wl;
+                rect[3] = wb-wt;
+                std::stringstream axTreeChildrenStream;
+                n.print(axTreeChildrenStream, PUGIXML_TEXT(axTreeIndent.c_str()), axTreeFormat, axTreeEncoding, axTreeDepth);
+                axTreeChildren = axTreeChildrenStream.str();
+                ax_hover_rect = rect;
 
-                    if (tpath)
-                    {
-                        pugi::xml_node w = tpath.node();
-                        //                        std::cout << std::endl;
-                        //                        std::cout << " @ " << t.attribute("clock").as_llong();
-                        //                        std::cout << " name " << w.name();// << std::endl;
-                        //                        std::cout << " AXTitle " << w.attribute("AXTitle").as_string() << std::endl;
+                windowTitle = n.attribute("title").as_string();
 
-                        /// Parse all window children to find a more precise target, depth first
-                        std::map<float, std::vector<float> > _rects;
-                        std::string _tab(" ");
-                        pugi::xml_node _w = w.first_child();
-                        pugi::xml_node _nfc;
-                        while( !_w.empty() ){
-                            bool matching_widget = false;
-                            pugi::xml_node c = _w;
-                            /// Make sure to parse all first-order children of the window
-                            if(c.parent() == w){
-                                _nfc = c.next_sibling();
-                                //                                std::cout << " (nfc=" << _nfc.name() << ") ";
+                /// Find the closest preceeding application node
+                for (pugi::xml_node t = closest_node; !t.empty(); t = t.previous_sibling()){
+                    if(std::string(t.name()) == "application"){
+                        std::string query = std::string("./AXApplication/AXWindow[@AXTitle='") + n.attribute("title").as_string() + "']";
+                        pugi::xpath_node tpath = t.select_single_node(query.c_str());
+
+                        if (tpath)
+                        {
+                            pugi::xml_node w = tpath.node();
+                            //                        std::cout << std::endl;
+                            //                        std::cout << " @ " << t.attribute("clock").as_llong();
+                            //                        std::cout << " name " << w.name();// << std::endl;
+                            //                        std::cout << " AXTitle " << w.attribute("AXTitle").as_string() << std::endl;
+
+                            /// Parse all window children to find a more precise target, depth first
+                            //std::map<float, std::vector<float> > _rects;
+                            //std::map<float, std::string > _axTreeChildrens;
+                            std::map<float, InspectorWidgetAccessibilityHoverInfo> _infos;
+
+                            std::string _tab(" ");
+                            pugi::xml_node _w = w.first_child();
+                            pugi::xml_node _nfc;
+                            while( !_w.empty() ){
+                                bool matching_widget = false;
+                                pugi::xml_node c = _w;
+                                /// Make sure to parse all first-order children of the window
+                                if(c.parent() == w){
+                                    _nfc = c.next_sibling();
+                                    //                                std::cout << " (nfc=" << _nfc.name() << ") ";
+                                }
+                                std::string _wf = c.attribute("AXFrame").as_string();
+                                std::vector<std::string> _wps = splitconstraint(_wf,' ');
+                                float _wx = 0.0;
+                                float _wy = 0.0;
+                                float _ww = 0.0;
+                                float _wh = 0.0;
+                                //                            std::cout << _tab;
+                                //                            std::cout << " child " << c.name();
+                                //                            std::cout << " AXTitle " << c.attribute("AXFrame").as_string();
+                                //                            std::cout << " AXFrame " << _wf;
+                                for(std::vector<std::string>::iterator _wp = _wps.begin(); _wp!=_wps.end();_wp++){
+                                    std::string _wn = _wp->substr(0,1);
+                                    std::string _wv = _wp->substr(2,_wp->length()-1);
+                                    if(_wn == "x"){
+                                        _wx = atoi(_wv.c_str());
+                                    }
+                                    else if(_wn == "y"){
+                                        _wy = atoi(_wv.c_str());
+                                    }
+                                    else if(_wn == "w"){
+                                        _ww = atoi(_wv.c_str());
+                                    }
+                                    else if(_wn == "h"){
+                                        _wh = atoi(_wv.c_str());
+                                    }
+                                }
+                                float _wl = _wx/float(this->video_w);
+                                float _wr = (_wx+_ww)/float(this->video_w);
+                                float _wt = _wy/float(this->video_h);
+                                float _wb = (_wy+_wh)/float(this->video_h);
+                                //                            std::cout << " wl=" << _wl << " wr=" << _wr << " wt=" << _wt << " wb=" << _wb << " ";
+                                //                            std::cout << " x=" << x << " y=" << y;
+
+                                if( _wl < _x && _x < _wr && _wt < _y && _y < _wb){
+                                    //                                std::cout << " MATCHES ";
+                                    std::vector<float> _rect(4,0.0);
+                                    _rect[0] = _wl;
+                                    _rect[1] = _wt;
+                                    _rect[2] = _wr-_wl;
+                                    _rect[3] = _wb-_wt;
+
+                                    /// Map all rect candidates by area
+                                    float area = (_wr-_wl)*(_wb-_wt);
+                                    InspectorWidgetAccessibilityHoverInfo _info;
+                                    _info.rect = _rect;
+                                    _info.xml_node = c;
+                                    _infos[area] = _info;
+
+                                    //                                std::cout << std::endl;
+                                    _w = _w.first_child();
+                                    _tab += " ";
+                                    matching_widget = true;
+                                }
+                                else{
+                                    _w = _w.next_sibling();
+                                }
+                                if(_w.empty()){
+                                    _w = _nfc;
+                                    _tab = " ";
+                                }
+
+                                //                            std::cout << std::endl;
                             }
-                            std::string _wf = c.attribute("AXFrame").as_string();
-                            std::vector<std::string> _wps = splitconstraint(_wf,' ');
-                            float _wx = 0.0;
-                            float _wy = 0.0;
-                            float _ww = 0.0;
-                            float _wh = 0.0;
-                            //                            std::cout << _tab;
-                            //                            std::cout << " child " << c.name();
-                            //                            std::cout << " AXTitle " << c.attribute("AXFrame").as_string();
-                            //                            std::cout << " AXFrame " << _wf;
-                            for(std::vector<std::string>::iterator _wp = _wps.begin(); _wp!=_wps.end();_wp++){
-                                std::string _wn = _wp->substr(0,1);
-                                std::string _wv = _wp->substr(2,_wp->length()-1);
-                                if(_wn == "x"){
-                                    _wx = atoi(_wv.c_str());
-                                }
-                                else if(_wn == "y"){
-                                    _wy = atoi(_wv.c_str());
-                                }
-                                else if(_wn == "w"){
-                                    _ww = atoi(_wv.c_str());
-                                }
-                                else if(_wn == "h"){
-                                    _wh = atoi(_wv.c_str());
-                                }
-                            }
-                            float _wl = _wx/float(this->video_w);
-                            float _wr = (_wx+_ww)/float(this->video_w);
-                            float _wt = _wy/float(this->video_h);
-                            float _wb = (_wy+_wh)/float(this->video_h);
-                            //                            std::cout << " wl=" << _wl << " wr=" << _wr << " wt=" << _wt << " wb=" << _wb << " ";
-                            //                            std::cout << " x=" << x << " y=" << y;
-
-                            if( _wl < x && x < _wr && _wt < y && y < _wb){
-                                //                                std::cout << " MATCHES ";
-                                std::vector<float> _rect(4,0.0);
-                                _rect[0] = _wl;
-                                _rect[1] = _wt;
-                                _rect[2] = _wr-_wl;
-                                _rect[3] = _wb-_wt;
-
-                                /// Map all rect candidates by area
-                                _rects[ (_wr-_wl)*(_wb-_wt) ] = _rect;
-                                //                                std::cout << std::endl;
-                                _w = _w.first_child();
-                                _tab += " ";
-                                matching_widget = true;
+                            /// Choose the rect candidate with minimal area (if any)
+                            pugi::xml_node c;
+                            if(_infos.size()>0){
+                                ax_hover_rect = _infos.begin()->second.rect;
+                                c = _infos.begin()->second.xml_node;
                             }
                             else{
-                                _w = _w.next_sibling();
-                            }
-                            if(_w.empty()){
-                                _w = _nfc;
-                                _tab = " ";
+                                c = w;
+                                std::cerr << "No matching widget for window titled " << n.attribute("title").as_string() << std::endl;
                             }
 
-                            //                            std::cout << std::endl;
+                            //axTreeChildren = _infos.begin()->second.xml_tree_children;
+                            //axTreeParents = _infos.begin()->second.xml_tree_parents;
+
+                            std::stringstream _axTreeChildrenStream;
+                            c.print(_axTreeChildrenStream, PUGIXML_TEXT(axTreeIndent.c_str()), axTreeFormat, axTreeEncoding, axTreeDepth);
+                            axTreeChildren = _axTreeChildrenStream.str();
+
+                            pugi::xml_node _p,_c;
+                            _c = c;
+                            //std::string indent("");
+                            pugi::xml_document  _d;
+                            while (!_c.parent().empty() && std::string(_c.first_child().name()) != "AXApplication"){
+                                pugi::xml_node __c = _d.append_child(_c.name());
+                                //std::cout << indent << _c.name() << std::endl;
+                                __c.set_value(_c.value());
+                                for (pugi::xml_attribute _a: _c.attributes()){
+                                    //std::cout << indent << "-" << _a.name() << std::endl;
+                                    pugi::xml_attribute __a = __c.append_attribute(_a.name());
+                                    __a.set_value(_a.value());
+                                }
+                                __c.append_copy(_p);
+                                _p = __c;
+                                _c = _c.parent();
+                                //indent += " ";
+                            }
+                            std::stringstream _axTreeParentsStream;
+                            _p.print(_axTreeParentsStream, PUGIXML_TEXT(axTreeIndent.c_str()), axTreeFormat, axTreeEncoding, axTreeDepth);
+                            axTreeParents = _axTreeParentsStream.str();
+
+                            //                        std::cout << std::endl;
+                            break;
                         }
-                        /// Choose the rect candidate with minimal area (if any)
-                        if(_rects.size()>0){
-                            rect = _rects.begin()->second;
-                        }
-                        //                        std::cout << std::endl;
-                        return rect;
                     }
                 }
+                break;
             }
-            break;
+            //        std::cout << std::endl;
         }
-        //        std::cout << std::endl;
+        //}
     }
-    return rect;
+    if(axTreeChildren.empty()){
+        ax_hover_tree_children = "";
+        ax_hover_rect = std::vector<float>(4,0.0);
+        axTreeChildren = "empty";
+    }
+    else if(axTreeChildren == ax_hover_tree_children){
+        axTreeChildren = "identical";
+    }
+    else{
+        ax_hover_tree_children = axTreeChildren;
+    }
+    if(axTreeParents.empty()){
+        ax_hover_tree_parents = "";
+        //ax_hover_rect = std::vector<float>(4,0.0);
+        axTreeParents = "empty";
+    }
+    else if(axTreeParents == ax_hover_tree_parents){
+        axTreeParents = "identical";
+    }
+    else{
+        ax_hover_tree_parents = axTreeParents;
+    }
+    ax_hover_x =_x;
+    ax_hover_y =_y;
+    info.xml_tree_children = axTreeChildren;
+    info.xml_tree_parents = axTreeParents;
+    //std::cout << "Parents " << axTreeParents << std::endl;
+    info.rect = ax_hover_rect;
+    return info;
 }
 
 bool InspectorWidgetProcessor::parseComputerVisionEvents(PCP::CsvConfig* cv_csv){

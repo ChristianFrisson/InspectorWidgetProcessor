@@ -26,7 +26,7 @@ class InspectorWidgetProcessorWrapper : public Nan::ObjectWrap {
     static void Abort(const Nan::FunctionCallbackInfo<v8::Value>& info);    
     static void Status(const Nan::FunctionCallbackInfo<v8::Value>& info);
     static void AnnotationStatus(const Nan::FunctionCallbackInfo<v8::Value>& info);
-    static void AccessibilityUnderMouse(const Nan::FunctionCallbackInfo<v8::Value>& info);
+    static void AccessibilityHover(const Nan::FunctionCallbackInfo<v8::Value>& info);
     static Nan::Persistent<v8::Function> constructor;
     InspectorWidgetProcessor* server;
 };

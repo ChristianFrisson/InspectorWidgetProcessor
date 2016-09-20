@@ -79,7 +79,7 @@ void InspectorWidgetProcessorWrapper::Init(v8::Local<v8::Object> exports) {
     Nan::SetPrototypeMethod(tpl, "abort", Abort);
     Nan::SetPrototypeMethod(tpl, "status", Status);
     Nan::SetPrototypeMethod(tpl, "annotationStatus", AnnotationStatus);
-    Nan::SetPrototypeMethod(tpl, "accessibilityUnderMouse", AccessibilityUnderMouse);
+    Nan::SetPrototypeMethod(tpl, "accessibilityHover", AccessibilityHover);
 
     constructor.Reset(tpl->GetFunction());
     exports->Set(Nan::New("InspectorWidgetProcessor").ToLocalChecked(), tpl->GetFunction());
@@ -242,7 +242,7 @@ void InspectorWidgetProcessorWrapper::Status(const Nan::FunctionCallbackInfo<v8:
 
 }
 
-void InspectorWidgetProcessorWrapper::AccessibilityUnderMouse(const Nan::FunctionCallbackInfo<v8::Value>& info) {
+void InspectorWidgetProcessorWrapper::AccessibilityHover(const Nan::FunctionCallbackInfo<v8::Value>& info) {
     int argc = info.Length();
     if (argc != 5) {
         Nan::ThrowTypeError("Wrong number of arguments");
@@ -279,18 +279,26 @@ void InspectorWidgetProcessorWrapper::AccessibilityUnderMouse(const Nan::Functio
     v8::Local<v8::Value> y = Nan::Null();
     v8::Local<v8::Value> w = Nan::Null();
     v8::Local<v8::Value> h = Nan::Null();
+    v8::Local<v8::Value> axTreeChildren = Nan::Null();
+    v8::Local<v8::Value> axTreeParents = Nan::Null();
     if(obj->getServer()){
         std::string error_string = obj->getServer()->getStatusError();
         std::string success_string = obj->getServer()->getStatusSuccess();
         std::string phase_string = obj->getServer()->getStatusPhase();
-        std::vector<float> rect = obj->getServer()->getAccessibilityUnderMouse(atof(args[1].c_str()),atof(args[2].c_str()),atof(args[3].c_str()));
+        InspectorWidgetAccessibilityHoverInfo result = obj->getServer()->getAccessibilityHover(atof(args[1].c_str()),atof(args[2].c_str()),atof(args[3].c_str()));
+        //std::vector<float> rect = obj->getServer()->getAccessibilityUnderMouse(atof(args[1].c_str()),atof(args[2].c_str()),atof(args[3].c_str()));
         //std::cout << "InspectorWidgetProcessorWrapper: error " << error_string  << " success " << success_string << " phase " << phase_string << std::endl;
+        std::vector<float> rect = result.rect;
+        if(rect.size() == 4){
+            x = Nan::New(rect[0]);
+            y = Nan::New(rect[1]);
+            w = Nan::New(rect[2]);
+            h = Nan::New(rect[3]);
+        }
+        axTreeChildren = Nan::New(result.xml_tree_children.c_str()).ToLocalChecked();
+        axTreeParents = Nan::New(result.xml_tree_parents.c_str()).ToLocalChecked();
         error = Nan::New(error_string.c_str()).ToLocalChecked();
         success = Nan::New(success_string).ToLocalChecked();
-        x = Nan::New(rect[0]);
-        y = Nan::New(rect[1]);
-        w = Nan::New(rect[2]);
-        h = Nan::New(rect[3]);
     }
     v8::Local<v8::Value> id = Nan::New(args[0]).ToLocalChecked();
 
@@ -301,8 +309,10 @@ void InspectorWidgetProcessorWrapper::AccessibilityUnderMouse(const Nan::Functio
         ,y
         ,w
         ,h
+        ,axTreeParents
+        ,axTreeChildren
     };
-    callback->Call(6, argv);
+    callback->Call(8, argv);
 }
 
 void InspectorWidgetProcessorWrapper::AnnotationStatus(const Nan::FunctionCallbackInfo<v8::Value>& info) {

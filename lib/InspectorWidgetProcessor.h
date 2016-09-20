@@ -108,6 +108,14 @@ struct InspectorWidgetTime {
     }
 };
 
+struct InspectorWidgetAccessibilityHoverInfo {
+    std::vector<float> rect;
+    std::string xml_tree_children;
+    std::string xml_tree_parents;
+    pugi::xml_node xml_node;
+    InspectorWidgetAccessibilityHoverInfo():rect(std::vector<float>()),xml_tree_children(""),xml_tree_parents(""){}
+};
+
 class InspectorWidgetProcessor{
     friend class InspectorWidgetProcessorCommandParser::operators;
 
@@ -131,11 +139,24 @@ public:
     std::vector<std::string> getAccessibilityAnnotations(std::vector<std::string> names);
     std::vector<std::string> getAnnotations(std::vector<std::string> names);
     
-    /// getAccessibilityUnderMouse
+    /// getAccessibilityHover
     /// time in sec
     /// x and y are ratios: pixel dimensions divided by video sizes
-    std::vector<float> getAccessibilityUnderMouse(float time, float x, float y);
+    InspectorWidgetAccessibilityHoverInfo getAccessibilityHover(float time, float x, float y);
+private:
+    float ax_hover_time;
+    float ax_hover_x;
+    float ax_hover_y;
+    std::vector<float> ax_hover_rect;
+    std::string ax_hover_tree_children;
+    std::string ax_hover_tree_parents;
+    /*pugi::xml_node ax_hover_root;
+    bool ax_hover_root_parsed;
+    pugi::xml_node ax_hover_closest_node;
+    pugi::xml_node ax_hover_closest_window_node;
+    bool ax_hover_closest_parsed;*/
 
+public:
     std::vector<std::string> getTemplateList(){return template_list;}
 
     bool init( int argc, char** argv );
