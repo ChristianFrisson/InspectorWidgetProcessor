@@ -36,13 +36,15 @@ InspectorWidget Processor is based on:
 Instructions
 * Mac OSX 10.6+ with MacPorts
 ```sudo port install opencv +ffmpeg```
+```sudo port install tesseract```
 ```sudo port install npm```
 * Mac OSX 10.6+ with Homebrew
 ```brew install opencv --with-ffmpeg --with-tbb```
+```brew install tesseract --with-opencl```
 ```brew install npm```
 * Ubuntu 16.04
 ```
-sudo apt install npm libopencv-dev libxtst-dev libxt-dev libxkbfile-dev libx11-xcb-dev libxkbcommon-dev libxkbcommon-x11-dev
+sudo apt install npm libopencv-dev libtesseract-dev libxtst-dev libxt-dev libxkbfile-dev libx11-xcb-dev libxkbcommon-dev libxkbcommon-x11-dev
 sudo update-alternatives --install /usr/bin/node node /usr/bin/nodejs 10
 ```
 
