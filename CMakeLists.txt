@@ -183,15 +183,16 @@ if(NOT RAPIDJSON_DIR OR NOT PARTIALCSVPARSER_DIR OR NOT LIBUIOHOOK_DIR OR NOT PE
 	execute_process(COMMAND ${GIT} submodule update --init ${CMAKE_CURRENT_SOURCE_DIR} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} OUTPUT_VARIABLE GIT_OUT RESULT_VARIABLE GIT_RES)
 endif()
 
-set(RAPIDJSON_BUILD_DOC OFF CACHE STRING "" FORCE)
-set(RAPIDJSON_BUILD_EXAMPLES OFF CACHE STRING "" FORCE)
-set(RAPIDJSON_BUILD_TESTS OFF CACHE STRING "" FORCE)
-set(RAPIDJSON_BUILD_THIRDPARTY_GTEST OFF CACHE STRING "" FORCE)
+set(RAPIDJSON_BUILD_DOC OFF CACHE BOOL "" FORCE)
+set(RAPIDJSON_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(RAPIDJSON_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(RAPIDJSON_BUILD_THIRDPARTY_GTEST OFF CACHE BOOL "" FORCE)
 add_subdirectory(3rdparty/github-InspectorWidget-rapidjson)
 include_directories(${CMAKE_SOURCE_DIR}/3rdparty/github-InspectorWidget-rapidjson/include)
 
 include_directories(${CMAKE_SOURCE_DIR}/3rdparty/github-InspectorWidget-PartialCsvParser/include)
 
+set(BUILD_APPS OFF CACHE BOOL "" FORCE)
 add_subdirectory(3rdparty/github-InspectorWidget-libuiohook)
 include_directories(${CMAKE_SOURCE_DIR}/3rdparty/github-InspectorWidget-libuiohook/include)
 
