@@ -4103,10 +4103,14 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
     ax_hover_root_parsed = true;
     //}
 
+    //std::cout << "getAccessibilityHover: time: " << _time << " x: "<< _x << " y: "<< _y<<std::endl;
+
     /// Find the closest node before time
     pugi::xml_node closest_node;// = ax_hover_closest_node;
     pugi::xml_node closest_window_node;// = ax_hover_closest_window_node;
+    uint64_t closest_node_clock = 0;
     uint64_t closest_window_node_clock = 0;
+    uint64_t closest_application_node_clock = 0;
     //if( ax_hover_time != _time || closest_node.empty() || closest_window_node.empty()){
     pugi::xml_node _prev_node;
     uint64_t _prev_clock = this->start_clock;
@@ -4118,6 +4122,7 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
         if(_clock > this->start_clock && _clock < this->end_clock && _prev_clock < time && time < _clock){
             //std::cout << "here" << std::endl;
             closest_node = n;
+            closest_node_clock = _clock;
             break;
         }
         _prev_clock = _clock;
@@ -4130,6 +4135,8 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
         this->setStatusAndReturn("accessibility", msg.str(), "");
         return info;
     }
+
+    //std::cout << "- closest node at " << closest_node_clock << std::endl;
 
     /// Find the closest preceeding windowEvent node before the closest node before time
     for (pugi::xml_node n = closest_node; !n.empty(); n = n.previous_sibling()){
@@ -4151,6 +4158,8 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
     ax_hover_closest_window_node = closest_window_node;
     //}
     ax_hover_time = _time;
+
+    //std::cout << "-- closest preceeding windowEvent at " << closest_window_node_clock << std::endl;
 
     /// List all windows that contain x and y
     std::string windowTitle;
@@ -4204,6 +4213,10 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
                             //                        std::cout << " name " << w.name();// << std::endl;
                             //                        std::cout << " AXTitle " << w.attribute("AXTitle").as_string() << std::endl;
 
+
+                            closest_application_node_clock = t.attribute("clock").as_llong();
+                            //std::cout << "--- closest preceeding application at " << closest_application_node_clock << std::endl;
+
                             /// Parse all window children to find a more precise target, depth first
                             //std::map<float, std::vector<float> > _rects;
                             //std::map<float, std::string > _axTreeChildrens;
@@ -4220,41 +4233,99 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
                                     _nfc = c.next_sibling();
                                     //                                std::cout << " (nfc=" << _nfc.name() << ") ";
                                 }
-                                std::string _wf = c.attribute("AXFrame").as_string();
-                                std::vector<std::string> _wps = splitconstraint(_wf,' ');
+                                /// Find location and dimensions of the widget
                                 float _wx = 0.0;
                                 float _wy = 0.0;
                                 float _ww = 0.0;
                                 float _wh = 0.0;
-                                //                            std::cout << _tab;
-                                //                            std::cout << " child " << c.name();
-                                //                            std::cout << " AXTitle " << c.attribute("AXFrame").as_string();
-                                //                            std::cout << " AXFrame " << _wf;
-                                for(std::vector<std::string>::iterator _wp = _wps.begin(); _wp!=_wps.end();_wp++){
-                                    std::string _wn = _wp->substr(0,1);
-                                    std::string _wv = _wp->substr(2,_wp->length()-1);
-                                    if(_wn == "x"){
-                                        _wx = atoi(_wv.c_str());
-                                    }
-                                    else if(_wn == "y"){
-                                        _wy = atoi(_wv.c_str());
-                                    }
-                                    else if(_wn == "w"){
-                                        _ww = atoi(_wv.c_str());
-                                    }
-                                    else if(_wn == "h"){
-                                        _wh = atoi(_wv.c_str());
+                                /// First try with AXFrame attribute
+                                std::string _wf = c.attribute("AXFrame").as_string();
+                                if(!_wf.empty()){
+                                    std::vector<std::string> _wps = splitconstraint(_wf,' ');
+                                    //                            std::cout << _tab;
+                                    //                            std::cout << " child " << c.name();
+                                    //                            std::cout << " AXTitle " << c.attribute("AXFrame").as_string();
+                                    //                            std::cout << " AXFrame " << _wf;
+                                    for(std::vector<std::string>::iterator _wp = _wps.begin(); _wp!=_wps.end();_wp++){
+                                        if(!_wp->empty()){
+                                            std::string _wn = _wp->substr(0,1);
+                                            std::string _wv = _wp->substr(2,_wp->length()-1);
+                                            if(_wn == "x"){
+                                                _wx = atoi(_wv.c_str());
+                                            }
+                                            else if(_wn == "y"){
+                                                _wy = atoi(_wv.c_str());
+                                            }
+                                            else if(_wn == "w"){
+                                                _ww = atoi(_wv.c_str());
+                                            }
+                                            else if(_wn == "h"){
+                                                _wh = atoi(_wv.c_str());
+                                            }
+                                        }
                                     }
                                 }
+                                else{
+                                    //std::cout << "---- AXFrame not found " << std::endl;
+                                    /// Otherwise try with AXPosition and AXSize attributes
+                                    std::string _wp = c.attribute("AXPosition").as_string();
+                                    std::string _ws = c.attribute("AXSize").as_string();
+                                    /*if(_wp.empty()){
+                                        std::cout << "---- AXPosition not found " << std::endl;
+                                    }
+                                    if(_ws.empty()){
+                                        std::cout << "---- AXSize not found " << std::endl;
+                                    }*/
+                                    std::vector<std::string> _wpcs = splitconstraint(_wp,' ');
+                                    std::vector<std::string> _wscs = splitconstraint(_ws,' ');
+                                    for(std::vector<std::string>::iterator _wpc = _wpcs.begin(); _wpc!=_wpcs.end();_wpc++){
+                                        if(!_wpc->empty()){
+                                            std::string _wn = _wpc->substr(0,1);
+                                            std::string _wv = _wpc->substr(2,_wpc->length()-1);
+                                            if(_wn == "x"){
+                                                _wx = atoi(_wv.c_str());
+                                            }
+                                            else if(_wn == "y"){
+                                                _wy = atoi(_wv.c_str());
+                                            }
+                                            else if(_wn == "w"){
+                                                _ww = atoi(_wv.c_str());
+                                            }
+                                            else if(_wn == "h"){
+                                                _wh = atoi(_wv.c_str());
+                                            }
+                                        }
+                                    }
+                                    for(std::vector<std::string>::iterator _wps = _wscs.begin(); _wps!=_wscs.end();_wps++){
+                                        if(!_wps->empty()){
+                                            std::string _wn = _wps->substr(0,1);
+                                            std::string _wv = _wps->substr(2,_wps->length()-1);
+                                            if(_wn == "x"){
+                                                _wx = atoi(_wv.c_str());
+                                            }
+                                            else if(_wn == "y"){
+                                                _wy = atoi(_wv.c_str());
+                                            }
+                                            else if(_wn == "w"){
+                                                _ww = atoi(_wv.c_str());
+                                            }
+                                            else if(_wn == "h"){
+                                                _wh = atoi(_wv.c_str());
+                                            }
+                                        }
+                                    }
+                                }
+
                                 float _wl = _wx/float(this->video_w);
                                 float _wr = (_wx+_ww)/float(this->video_w);
                                 float _wt = _wy/float(this->video_h);
                                 float _wb = (_wy+_wh)/float(this->video_h);
+                                //std::cout << "---- "<< c.   name() << " title=" << c.attribute("AXTitle").as_string() << " wl=" << _wl << " wr=" << _wr << " wt=" << _wt << " wb=" << _wb << " ";
                                 //                            std::cout << " wl=" << _wl << " wr=" << _wr << " wt=" << _wt << " wb=" << _wb << " ";
                                 //                            std::cout << " x=" << x << " y=" << y;
 
                                 if( _wl < _x && _x < _wr && _wt < _y && _y < _wb){
-                                    //                                std::cout << " MATCHES ";
+                                    //std::cout << " MATCHES ";
                                     std::vector<float> _rect(4,0.0);
                                     _rect[0] = _wl;
                                     _rect[1] = _wt;
@@ -4267,8 +4338,8 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
                                     _info.rect = _rect;
                                     _info.xml_node = c;
                                     _infos[area] = _info;
-
-                                    //                                std::cout << std::endl;
+                                    //std::cout << " area=" << area;
+                                     //std::cout << std::endl;
                                     _w = _w.first_child();
                                     _tab += " ";
                                     matching_widget = true;
@@ -4276,14 +4347,16 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
                                 else{
                                     _w = _w.next_sibling();
                                 }
+
                                 if(_w.empty()){
                                     _w = _nfc;
                                     _tab = " ";
                                 }
 
-                                //                            std::cout << std::endl;
+                                //std::cout << std::endl;
                             }
                             /// Choose the rect candidate with minimal area (if any)
+                            //std::cout << "--- candidates:" << _infos.size() << std::endl;
                             pugi::xml_node c;
                             if(_infos.size()>0){
                                 ax_hover_rect = _infos.begin()->second.rect;
@@ -4361,6 +4434,7 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
     info.xml_tree_children = axTreeChildren;
     info.xml_tree_parents = axTreeParents;
     //std::cout << "Parents " << axTreeParents << std::endl;
+    std::cout << "- rect "<< ax_hover_rect[0] << " " << ax_hover_rect[1] << " " << ax_hover_rect[2] << " " << ax_hover_rect[3] << " " <<std::endl;
     info.rect = ax_hover_rect;
     return info;
 }
