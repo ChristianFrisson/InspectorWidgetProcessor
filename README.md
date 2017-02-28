@@ -33,20 +33,33 @@ InspectorWidget Processor is based on:
 - [laysakura](https://github.com/laysakura) / [PartialCsvParser](https://github.com/laysakura/PartialCsvParser): a library for comma-separated value (CSV) file I/O
 - [miloyip](https://github.com/miloyip) / [rapidjson](https://github.com/miloyip/rapidjson): a library for JSON file I/O
 
-Instructions
-* Mac OSX 10.6+ with MacPorts
-```sudo port install opencv +ffmpeg```
-```sudo port install tesseract```
-```sudo port install npm```
-* Mac OSX 10.6+ with Homebrew
+### macOS 10.9+ with Homebrew
+Core dependencies:
 ```brew install opencv --with-ffmpeg --with-tbb```
 ```brew install tesseract --with-opencl```
-```brew install npm```
-* Ubuntu 16.04
+```brew install cmake npm```
+
+To build the documentation:
+```brew install doxygen gnuplot graphviz wget```
+
+### macOS 10.9+ with MacPorts
+Core dependencies:
+```sudo port install opencv +ffmpeg```
+```sudo port install tesseract```
+```sudo port install cmake npm```
+
+To build the documentation:
+```sudo port install doxygen gnuplot graphviz wget```
+
+### Ubuntu 16.04
+Core dependencies:
 ```
-sudo apt install npm libopencv-dev libtesseract-dev libxtst-dev libxt-dev libxkbfile-dev libx11-xcb-dev libxkbcommon-dev libxkbcommon-x11-dev
+sudo apt install cmake npm libopencv-dev libtesseract-dev libxtst-dev libxt-dev libxkbfile-dev libx11-xcb-dev libxkbcommon-dev libxkbcommon-x11-dev
 sudo update-alternatives --install /usr/bin/node node /usr/bin/nodejs 10
 ```
+
+To build the documentation:
+```sudo apt install doxygen gnuplot graphviz wget```
 
 ## Installation
 
@@ -57,6 +70,12 @@ Then open a terminal in the source directory (`<source_path>`), Internet connexi
 * install node dependencies
 ```sudo npm i cmake-js -g```
 ```npm install```
+* build
+```cmake <source_path>```
+```make```
+* build the documentation
+```cmake <source_path> -DBUILD_DOCUMENTATION=ON```
+```make doc```
 
 ## License
 

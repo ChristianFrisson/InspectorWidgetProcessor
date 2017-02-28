@@ -281,3 +281,89 @@ message("[X] ${PROJECT_NAME}")
 if(BUILD_TESTS)
 	add_subdirectory(tests)
 endif()
+
+######################
+#   DOCUMENTATION    #
+######################
+
+option(BUILD_DOCUMENTATION "Build documentation" OFF)
+if(BUILD_DOCUMENTATION)
+    find_package(UnixCommands REQUIRED)
+    find_package(Doxygen REQUIRED)
+    find_package(Gnuplot REQUIRED)
+    find_package(HTMLHelp REQUIRED)
+    find_package(Perl REQUIRED)
+    find_package(Wget REQUIRED)
+
+    # Warning: doxygen doesn't confuse YES/NO and ON/OFF like CMake does
+    set(GENERATE_LATEX NO)
+    find_package(LATEX)
+    if(PDFLATEX_COMPILER)
+        set(GENERATE_LATEX YES)
+    endif()
+
+    if(DOT)
+        set(HAVE_DOT YES)
+    else()
+        set(HAVE_DOT NO)
+        message(FATAL_ERROR "Graphviz dot missing.")
+    endif()
+
+    set(CALL_GRAPH YES)# if set to YES, a graphical call graph is drawn for each function showing the functions that the function directly or indirectly calls.
+    set(CALLER_GRAPH YES)# if set to YES, a graphical caller graph is drawn for each function showing the functions that the function is directly or indirectly called by.
+    option(DOCUMENTATION_GRAPH_FUNCTION_CALLS "Enable graphical call/callers graphs for each function that the functions calls/are called by." ON)
+    if(DOCUMENTATION_GRAPH_FUNCTION_CALLS)
+        set(CALL_GRAPH YES)
+        set(CALLER_GRAPH YES)
+    endif()
+
+    option(DOCUMENTATION_HTML_HELP "Build the HTML Help file (CHM)." OFF)
+    option(DOCUMENTATION_HTML_TARZ "Build a compressed tar archive of the HTML doc." OFF)
+
+    option(BUILD_REF_DOCS_SEARCHENGINE "Enable doxygen's search engine (requires that documentation to be installed on a php enabled web server)" ON)
+    if(BUILD_REF_DOCS_SEARCHENGINE)
+        set(SEARCHENGINE YES)
+    else()
+        set(SEARCHENGINE NO)
+    endif()
+
+    option(BUILD_REF_DOCS_TAGFILE "Generate a tag file named ${PROJECT_NAME}.tag on the documentation web server" OFF)
+    if(BUILD_REF_DOCS_TAGFILE)
+        set(GENERATE_TAGFILE "${CMAKE_BINARY_DIR}/doc/${PROJECT_NAME}/${PROJECT_NAME}.tag")
+    else()
+        set(GENERATE_TAGFILE "")
+    endif()
+
+    # If html help generation was requested. DOCUMENTATION_HTML_HELP is defined by Documentation.cmake
+    set(GENERATE_HTMLHELP "NO")
+    if(DOCUMENTATION_HTML_HELP)
+        # on windows Documentation.cmake finds the html help workshop fi it exists. On u*ix we might have it with wine but no way to point it out
+        if(NOT WIN32)
+            set(HTML_HELP_COMPILER "" CACHE FILEPATH "Enter location of the HTML help compiler to let doxygen compile html")
+            mark_as_advanced(HTML_HELP_COMPILER)
+        endif()
+        # this var sets a proper value in .doxygen files when coniguring them below
+        set(GENERATE_HTMLHELP "YES")
+    endif()
+
+    # This processes our doxyfile.cmake and substitutes paths to generate
+    # a final Doxyfile
+    configure_file(${PROJECT_SOURCE_DIR}/doc/doxyfile.cmake
+        ${PROJECT_BINARY_DIR}/doc/${PROJECT_NAME}.doxyfile
+    )
+    # copy the logo to documentations target folder
+    #configure_file(${PROJECT_SOURCE_DIR}/data/icons/${PROJECT_NAME}.png
+    #   ${PROJECT_BINARY_DIR}/doc/${PROJECT_NAME}/${PROJECT_NAME}.png COPYONLY
+    #)
+    #install(FILES ${PROJECT_BINARY_DIR}/doc/${PROJECT_NAME}-${${PROJECT_NAME}_VERSION}.chm DESTINATION doc OPTIONAL COMPONENT ${PROJECT_NAME}-doc)
+    install(DIRECTORY ${PROJECT_BINARY_DIR}/doc/${PROJECT_NAME} DESTINATION doc COMPONENT ${PROJECT_NAME}-doc)
+
+    # This creates a new target to build documentation.
+    # It runs ${DOXYGEN} which is the full path and executable to
+    # Doxygen on your system.
+    # It runs the final generated Doxyfile against it.
+    # The DOT_PATH is substituted into the Doxyfile.
+    add_custom_target(doc ${DOXYGEN}
+        ${PROJECT_BINARY_DIR}/doc/${PROJECT_NAME}.doxyfile
+    )
+endif()
