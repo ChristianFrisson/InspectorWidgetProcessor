@@ -47,7 +47,7 @@ LOOKUP_CACHE_SIZE      = 0
 # Build related configuration options
 #---------------------------------------------------------------------------
 EXTRACT_ALL            = YES
-EXTRACT_PRIVATE        = NO
+EXTRACT_PRIVATE        = YES
 EXTRACT_PACKAGE        = NO
 EXTRACT_STATIC         = NO
 EXTRACT_LOCAL_CLASSES  = YES
@@ -95,8 +95,7 @@ WARN_LOGFILE           =
 #---------------------------------------------------------------------------
 # configuration options related to the input files
 #---------------------------------------------------------------------------
-INPUT                  = ${${PROJECT_NAME}_SOURCE_DIR} \
-                         ${PROJECT_BINARY_DIR} \
+INPUT                  = ${${PROJECT_NAME}_SOURCE_DIR}/lib
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *ProcessorAPI.h 
 RECURSIVE              = YES
