@@ -9,53 +9,85 @@
 
 namespace InspectorWidget {
 
-/// Enum types not likely to be complemented anytime soon
+// Enum types not likely to be complemented anytime soon
+
+/// Types for temporal annotations
 enum AnnotationTemporalType{
+    /// Undefined temporal annotation type
     ANNOTATION_TEMPORAL_NONE = 0,
+    /// Event temporal annotation type
     ANNOTATION_TEMPORAL_EVENT = 1,
+    /// Segment temporal annotation type
     ANNOTATION_TEMPORAL_SEGMENT = 2
 };
 
+/// Types for spatial annotations
 enum AnnotationSpatialType{
+    /// Undefined spatial annotation type
     ANNOTATION_SPATIAL_NONE = 0,
+    /// Overlay spatial annotation type
     ANNOTATION_SPATIAL_OVERLAY = 1
 };
 
-/// Enum types that might be complemented rarely
+// Enum types that might be complemented rarely
+
+/// Types for annotation values
 enum AnnotationValueType{
+    /// Undefined annotation value type
     ANNOTATION_VALUE_NONE = 0,
+    /// String annotation value type
     ANNOTATION_VALUE_STRING = 1,
+    /// Float annotation value type
     ANNOTATION_VALUE_FLOAT = 2
 };
 
-/// Enum types that might be complemented by plugins
+// Enum types that might be complemented by plugins
+
+/// Types for annotation sources
 enum SourceType{
+    /// Undefined annotation source type
     SOURCE_NONE = 0,
+    /// Computer vision annotation source type
     SOURCE_CV = 1,
+    /// Accessibility annotation source type
     SOURCE_AX = 2,
+    /// Input hook annotation source type
     SOURCE_INPUT_HOOK = 3
 };
 
+/// Types for processing algorithms
 enum ProcessorType{
+    /// Default processing algorithm type
     PROCESSOR_NONE = 0,
+    /// Processing algorithms using OpenCV
     PROCESSOR_OPENCV = 1
 };
 
+/// Types for export algorithms
 enum ExportType{
+    /// Undefined export algorithm type
     EXPORT_NONE = 0,
+    /// Amalia.js export algorithm type
     EXPORT_AMALIA = 1
 };
 
+/// Types for files
 enum FileType{
+    /// Undefined file type
     FILE_NONE = 0,
+    /// mp4 file type
     FILE_MP4 = 1,
+    /// csv file type
     FILE_CSV = 2,
+    /// txt file type
     FILE_TXT = 3,
+    /// XML file type
     FILE_XML = 4,
+    /// JSON file type
     FILE_JSON = 5
 };
 
-
+/// Annotation element
 class AnnotationElement{
 public:
     AnnotationElement(int time):time(time){}
@@ -67,6 +99,7 @@ protected:
     int time;
 };
 
+/// Annotation event with float values
 class AnnotationFloatEvent : public AnnotationElement{
 public:
     AnnotationFloatEvent(int time, float value)
@@ -78,6 +111,7 @@ private:
     float value;
 };
 
+/// Annotation event with string values
 class AnnotationStringEvent : public AnnotationElement{
 public:
     AnnotationStringEvent(int time, std::string value)
@@ -89,6 +123,7 @@ private:
     std::string value;
 };
 
+/// Annotation segment with string values
 class AnnotationStringSegment : public AnnotationElement{
 public:
     AnnotationStringSegment(int start_time, int stop_time, std::string value)
@@ -101,6 +136,7 @@ private:
     std::string value;
 };
 
+/// Annotation segment with float values
 class AnnotationFloatSegment : public AnnotationElement{
 public:
     AnnotationFloatSegment(int start_time, int stop_time, float value)
@@ -113,6 +149,7 @@ private:
     float value;
 };
 
+/// Annotation container
 class Annotation{
 public:
     Annotation(){}
@@ -141,6 +178,7 @@ private:
 
 typedef std::map<std::string,Annotation> Annotations;
 
+/// Source element
 class SourceElement{
 public:
     SourceElement(int time):time(time){}
@@ -153,6 +191,7 @@ protected:
     int time;
 };
 
+/// Source container
 class Source{
 public:
     Source(){}
@@ -175,6 +214,7 @@ private:
     std::map<int,SourceElement*> elements;
 };
 
+/// Video source
 class VideoSource: public Source{
 public:
     VideoSource():Source(){}
@@ -196,6 +236,7 @@ private:
     Date start_d;
 };
 
+/// Collection container
 class Collection{
 public:
     Collection()
@@ -268,6 +309,7 @@ private:
     std::map<std::string,Source*> sources;
 };
 
+/// Annotation definition
 class AnnotationDefinition{
 public:
     AnnotationDefinition(){}
@@ -290,6 +332,7 @@ private:
     std::vector<std::string> variables;
 };
 
+/// Pipeline definition
 class Pipeline{
 public:
     Pipeline(){}
@@ -299,6 +342,7 @@ private:
     std::map<std::string,AnnotationDefinition*> annotation_definitions;
 };
 
+/// Analysis
 class Analysis{
 public:
     Analysis(){}
@@ -356,10 +400,11 @@ public:
     virtual bool exportFooter(){return false;}
 };
 
-class ProcessorNew{
+/// Processor project definition
+class Processor{
 public:
-    ProcessorNew(){}
-    ~ProcessorNew(){}
+    Processor(){}
+    ~Processor(){}
 private:
     Pipeline* pipeline;
     Analysis* analysis;
