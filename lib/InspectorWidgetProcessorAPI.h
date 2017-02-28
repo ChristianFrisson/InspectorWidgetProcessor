@@ -4,221 +4,221 @@
  * @author Christian Frisson
  */
 
-#ifndef InspectorWidgetProcessorAPI_H
-#define InspectorWidgetProcessorAPI_H
+#ifndef ProcessorAPI_H
+#define ProcessorAPI_H
 
-#include <InspectorWidgetProcessor.h>
+namespace InspectorWidget {
 
 /// Enum types not likely to be complemented anytime soon
-enum InspectorWidgetAnnotationTemporalType{
-    INSPECTOR_WIDGET_ANNOTATION_TEMPORAL_NONE = 0,
-    INSPECTOR_WIDGET_ANNOTATION_TEMPORAL_EVENT = 1,
-    INSPECTOR_WIDGET_ANNOTATION_TEMPORAL_SEGMENT = 2
+enum AnnotationTemporalType{
+    ANNOTATION_TEMPORAL_NONE = 0,
+    ANNOTATION_TEMPORAL_EVENT = 1,
+    ANNOTATION_TEMPORAL_SEGMENT = 2
 };
 
-enum InspectorWidgetAnnotationSpatialType{
-    INSPECTOR_WIDGET_ANNOTATION_SPATIAL_NONE = 0,
-    INSPECTOR_WIDGET_ANNOTATION_SPATIAL_OVERLAY = 1
+enum AnnotationSpatialType{
+    ANNOTATION_SPATIAL_NONE = 0,
+    ANNOTATION_SPATIAL_OVERLAY = 1
 };
 
 /// Enum types that might be complemented rarely
-enum InspectorWidgetAnnotationValueType{
-    INSPECTOR_WIDGET_ANNOTATION_VALUE_NONE = 0,
-    INSPECTOR_WIDGET_ANNOTATION_VALUE_STRING = 1,
-    INSPECTOR_WIDGET_ANNOTATION_VALUE_FLOAT = 2
+enum AnnotationValueType{
+    ANNOTATION_VALUE_NONE = 0,
+    ANNOTATION_VALUE_STRING = 1,
+    ANNOTATION_VALUE_FLOAT = 2
 };
 
 /// Enum types that might be complemented by plugins
-enum InspectorWidgetSourceType{
-    INSPECTOR_WIDGET_SOURCE_NONE = 0,
-    INSPECTOR_WIDGET_SOURCE_CV = 1,
-    INSPECTOR_WIDGET_SOURCE_AX = 2,
-    INSPECTOR_WIDGET_SOURCE_INPUT_HOOK = 3
+enum SourceType{
+    SOURCE_NONE = 0,
+    SOURCE_CV = 1,
+    SOURCE_AX = 2,
+    SOURCE_INPUT_HOOK = 3
 };
 
-enum InspectorWidgetProcessorType{
-    INSPECTOR_WIDGET_PROCESSOR_NONE = 0,
-    INSPECTOR_WIDGET_PROCESSOR_OPENCV = 1
+enum ProcessorType{
+    PROCESSOR_NONE = 0,
+    PROCESSOR_OPENCV = 1
 };
 
-enum InspectorWidgetExportType{
-    INSPECTOR_WIDGET_EXPORT_NONE = 0,
-    INSPECTOR_WIDGET_EXPORT_AMALIA = 1
+enum ExportType{
+    EXPORT_NONE = 0,
+    EXPORT_AMALIA = 1
 };
 
-enum InspectorWidgetFileType{
-    INSPECTOR_WIDGET_FILE_NONE = 0,
-    INSPECTOR_WIDGET_FILE_MP4 = 1,
-    INSPECTOR_WIDGET_FILE_CSV = 2,
-    INSPECTOR_WIDGET_FILE_TXT = 3,
-    INSPECTOR_WIDGET_FILE_XML = 4,
-    INSPECTOR_WIDGET_FILE_JSON = 5
+enum FileType{
+    FILE_NONE = 0,
+    FILE_MP4 = 1,
+    FILE_CSV = 2,
+    FILE_TXT = 3,
+    FILE_XML = 4,
+    FILE_JSON = 5
 };
 
 
-class InspectorWidgetAnnotationElement{
+class AnnotationElement{
 public:
-    InspectorWidgetAnnotationElement(int time):time(time){}
-    ~InspectorWidgetAnnotationElement(){}
-    virtual InspectorWidgetAnnotationTemporalType temporalType(){return INSPECTOR_WIDGET_ANNOTATION_TEMPORAL_NONE;}
-    virtual InspectorWidgetAnnotationValueType valueType(){return INSPECTOR_WIDGET_ANNOTATION_VALUE_NONE;}
+    AnnotationElement(int time):time(time){}
+    ~AnnotationElement(){}
+    virtual AnnotationTemporalType temporalType(){return ANNOTATION_TEMPORAL_NONE;}
+    virtual AnnotationValueType valueType(){return ANNOTATION_VALUE_NONE;}
     int getTime(){return time;}
 protected:
     int time;
 };
 
-class InspectorWidgetAnnotationFloatEvent : public InspectorWidgetAnnotationElement{
+class AnnotationFloatEvent : public AnnotationElement{
 public:
-    InspectorWidgetAnnotationFloatEvent(int time, float value)
-        :InspectorWidgetAnnotationElement(time),value(value) {}
-    ~InspectorWidgetAnnotationFloatEvent(){}
-    virtual InspectorWidgetAnnotationTemporalType temporalType(){return INSPECTOR_WIDGET_ANNOTATION_TEMPORAL_EVENT;}
-    virtual InspectorWidgetAnnotationValueType valueType(){return INSPECTOR_WIDGET_ANNOTATION_VALUE_FLOAT;}
+    AnnotationFloatEvent(int time, float value)
+        :AnnotationElement(time),value(value) {}
+    ~AnnotationFloatEvent(){}
+    virtual AnnotationTemporalType temporalType(){return ANNOTATION_TEMPORAL_EVENT;}
+    virtual AnnotationValueType valueType(){return ANNOTATION_VALUE_FLOAT;}
 private:
     float value;
 };
 
-class InspectorWidgetAnnotationStringEvent : public InspectorWidgetAnnotationElement{
+class AnnotationStringEvent : public AnnotationElement{
 public:
-    InspectorWidgetAnnotationStringEvent(int time, std::string value)
-        :InspectorWidgetAnnotationElement(time),value(value) {}
-    ~InspectorWidgetAnnotationStringEvent(){}
-    virtual InspectorWidgetAnnotationTemporalType temporalType(){return INSPECTOR_WIDGET_ANNOTATION_TEMPORAL_EVENT;}
-    virtual InspectorWidgetAnnotationValueType valueType(){return INSPECTOR_WIDGET_ANNOTATION_VALUE_STRING;}
+    AnnotationStringEvent(int time, std::string value)
+        :AnnotationElement(time),value(value) {}
+    ~AnnotationStringEvent(){}
+    virtual AnnotationTemporalType temporalType(){return ANNOTATION_TEMPORAL_EVENT;}
+    virtual AnnotationValueType valueType(){return ANNOTATION_VALUE_STRING;}
 private:
     std::string value;
 };
 
-class InspectorWidgetAnnotationStringSegment : public InspectorWidgetAnnotationElement{
+class AnnotationStringSegment : public AnnotationElement{
 public:
-    InspectorWidgetAnnotationStringSegment(int start_time, int stop_time, std::string value)
-        :InspectorWidgetAnnotationElement(start_time),stop_time(stop_time),value(value) {}
-    ~InspectorWidgetAnnotationStringSegment(){}
-    virtual InspectorWidgetAnnotationTemporalType temporalType(){return INSPECTOR_WIDGET_ANNOTATION_TEMPORAL_SEGMENT;}
-    virtual InspectorWidgetAnnotationValueType valueType(){return INSPECTOR_WIDGET_ANNOTATION_VALUE_STRING;}
+    AnnotationStringSegment(int start_time, int stop_time, std::string value)
+        :AnnotationElement(start_time),stop_time(stop_time),value(value) {}
+    ~AnnotationStringSegment(){}
+    virtual AnnotationTemporalType temporalType(){return ANNOTATION_TEMPORAL_SEGMENT;}
+    virtual AnnotationValueType valueType(){return ANNOTATION_VALUE_STRING;}
 private:
     int stop_time;
     std::string value;
 };
 
-class InspectorWidgetAnnotationFloatSegment : public InspectorWidgetAnnotationElement{
+class AnnotationFloatSegment : public AnnotationElement{
 public:
-    InspectorWidgetAnnotationFloatSegment(int start_time, int stop_time, float value)
-        :InspectorWidgetAnnotationElement(start_time),stop_time(stop_time),value(value) {}
-    ~InspectorWidgetAnnotationFloatSegment(){}
-    virtual InspectorWidgetAnnotationTemporalType temporalType(){return INSPECTOR_WIDGET_ANNOTATION_TEMPORAL_SEGMENT;}
-    virtual InspectorWidgetAnnotationValueType valueType(){return INSPECTOR_WIDGET_ANNOTATION_VALUE_FLOAT;}
+    AnnotationFloatSegment(int start_time, int stop_time, float value)
+        :AnnotationElement(start_time),stop_time(stop_time),value(value) {}
+    ~AnnotationFloatSegment(){}
+    virtual AnnotationTemporalType temporalType(){return ANNOTATION_TEMPORAL_SEGMENT;}
+    virtual AnnotationValueType valueType(){return ANNOTATION_VALUE_FLOAT;}
 private:
     int stop_time;
     float value;
 };
 
-class InspectorWidgetAnnotation{
+class Annotation{
 public:
-    InspectorWidgetAnnotation(){}
-    virtual ~InspectorWidgetAnnotation(){this->clear();}
+    Annotation(){}
+    virtual ~Annotation(){this->clear();}
 
     virtual std::string getName(){return "";}
-    virtual InspectorWidgetAnnotationTemporalType temporalType(){return INSPECTOR_WIDGET_ANNOTATION_TEMPORAL_NONE;}
-    virtual InspectorWidgetAnnotationValueType valueType(){return INSPECTOR_WIDGET_ANNOTATION_VALUE_NONE;}
+    virtual AnnotationTemporalType temporalType(){return ANNOTATION_TEMPORAL_NONE;}
+    virtual AnnotationValueType valueType(){return ANNOTATION_VALUE_NONE;}
 
-    bool addElement(InspectorWidgetAnnotationElement* element){
+    bool addElement(AnnotationElement* element){
         if(!element) return false;
         elements[element->getTime()] = element;
         return true;
     }
-    InspectorWidgetAnnotationElement* getElement(int time){return elements[time];}
+    AnnotationElement* getElement(int time){return elements[time];}
     void clear(){
-        for(std::map<int,InspectorWidgetAnnotationElement*>::iterator element=elements.begin();element!=elements.end();element++){
+        for(std::map<int,AnnotationElement*>::iterator element=elements.begin();element!=elements.end();element++){
             delete element->second;
         }
         elements.clear();
     }
 
 private:
-    std::map<int,InspectorWidgetAnnotationElement*> elements;
+    std::map<int,AnnotationElement*> elements;
 };
 
-typedef std::map<std::string,InspectorWidgetAnnotation> InspectorWidgetAnnotations;
+typedef std::map<std::string,Annotation> Annotations;
 
-class InspectorWidgetSourceElement{
+class SourceElement{
 public:
-    InspectorWidgetSourceElement(int time):time(time){}
-    ~InspectorWidgetSourceElement(){}
-    virtual InspectorWidgetSourceType sourceType(){return INSPECTOR_WIDGET_SOURCE_NONE;}
-    virtual InspectorWidgetFileType fileType(){return INSPECTOR_WIDGET_FILE_NONE;}
-    virtual InspectorWidgetProcessorType processorType(){return INSPECTOR_WIDGET_PROCESSOR_NONE;}
+    SourceElement(int time):time(time){}
+    ~SourceElement(){}
+    virtual SourceType sourceType(){return SOURCE_NONE;}
+    virtual FileType fileType(){return FILE_NONE;}
+    virtual ProcessorType processorType(){return PROCESSOR_NONE;}
     int getTime(){return time;}
 protected:
     int time;
 };
 
-class InspectorWidgetSource{
+class Source{
 public:
-    InspectorWidgetSource(){}
-    ~InspectorWidgetSource(){}
-    virtual InspectorWidgetSourceType sourceType(){return INSPECTOR_WIDGET_SOURCE_NONE;}
-    virtual InspectorWidgetFileType fileType(){return INSPECTOR_WIDGET_FILE_NONE;}
+    Source(){}
+    ~Source(){}
+    virtual SourceType sourceType(){return SOURCE_NONE;}
+    virtual FileType fileType(){return FILE_NONE;}
     virtual bool open(){return false;}
     virtual bool close(){return false;}
     virtual bool load(){return false;}
     virtual bool unload(){return false;}
-    std::map<int,InspectorWidgetSourceElement*> getElements(){return elements;}
-    InspectorWidgetSourceElement* getElement(int time){return elements[time];}
+    std::map<int,SourceElement*> getElements(){return elements;}
+    SourceElement* getElement(int time){return elements[time];}
     void clear(){
-        for(std::map<int,InspectorWidgetSourceElement*>::iterator element=elements.begin();element!=elements.end();element++){
+        for(std::map<int,SourceElement*>::iterator element=elements.begin();element!=elements.end();element++){
             delete element->second;
         }
         elements.clear();
     }
 private:
-    std::map<int,InspectorWidgetSourceElement*> elements;
+    std::map<int,SourceElement*> elements;
 };
 
-class InspectorWidgetVideoSource: public InspectorWidgetSource{
+class VideoSource: public Source{
 public:
-    InspectorWidgetVideoSource():InspectorWidgetSource(){}
-    ~InspectorWidgetVideoSource(){}
-    virtual InspectorWidgetSourceType sourceType(){return INSPECTOR_WIDGET_SOURCE_CV;}
+    VideoSource():Source(){}
+    ~VideoSource(){}
+    virtual SourceType sourceType(){return SOURCE_CV;}
     float getVideoFramerate(){return video_fps;}
     int getVideoWidth(){return video_w;}
     int getVideoHeight(){return video_h;}
     int getVideoFrameCount(){return video_frame_count;}
-    InspectorWidgetDate getStartDate(){return start_d;}
-    InspectorWidgetTime getStartTime(){return start_t;}
-    InspectorWidgetTime getEndTime(){return end_t;}
+    Date getStartDate(){return start_d;}
+    Time getStartTime(){return start_t;}
+    Time getEndTime(){return end_t;}
 private:
     float video_fps;
     int video_w;
     int video_h;
     int video_frame_count;
-    InspectorWidgetTime start_t,end_t;
-    InspectorWidgetDate start_d;
+    Time start_t,end_t;
+    Date start_d;
 };
 
-class InspectorWidgetCollection{
+class Collection{
 public:
-    InspectorWidgetCollection()
+    Collection()
         :video_fps(0),video_w(0),video_h(0),video_frame_count(0)
     {}
-    ~InspectorWidgetCollection(){this->clear();}
+    ~Collection(){this->clear();}
     std::string getFileName(){return "";}
-    InspectorWidgetDate getStartDate(){return start_d;}
-    InspectorWidgetTime getStartTime(){return start_t;}
+    Date getStartDate(){return start_d;}
+    Time getStartTime(){return start_t;}
     virtual bool sourcesInit(){return false;}
     bool init(){
         video_fps = 0;
         video_w = 0;
         video_h = 0;
         video_frame_count = 0;
-        start_t = InspectorWidgetTime();
-        end_t = InspectorWidgetTime();
-        start_d = InspectorWidgetDate();
+        start_t = Time();
+        end_t = Time();
+        start_d = Date();
         this->sourcesInit();
-        InspectorWidgetSource* _source = 0;
+        Source* _source = 0;
         int video_sources = 0;
-        for(std::map<std::string,InspectorWidgetSource*>::iterator source=sources.begin();source!=sources.end();source++){
-            if(source->second->sourceType() == INSPECTOR_WIDGET_SOURCE_CV){
+        for(std::map<std::string,Source*>::iterator source=sources.begin();source!=sources.end();source++){
+            if(source->second->sourceType() == SOURCE_CV){
                 video_sources++;
                 _source = source->second;
             }
@@ -227,7 +227,7 @@ public:
             std::cerr << "Collections require a single video source, found: " << video_sources << std::endl;
             return false;
         }
-        InspectorWidgetVideoSource* video_source = reinterpret_cast<InspectorWidgetVideoSource*>(_source);
+        VideoSource* video_source = reinterpret_cast<VideoSource*>(_source);
         if(!video_source){
             std::cerr << "The video source found in collection is malformed" << std::endl;
             return false;
@@ -243,16 +243,16 @@ public:
                 video_w == 0 ||
                 video_h == 0 ||
                 video_frame_count == 0 ||
-                start_t == InspectorWidgetTime()||
-                end_t == InspectorWidgetTime()||
-                start_d == InspectorWidgetDate()){
+                start_t == Time()||
+                end_t == Time()||
+                start_d == Date()){
             std::cerr << "The video source found in collection has uninitialized parameters" << std::endl;
             return false;
         }
         return true;
     }
     void clear(){
-        for(std::map<std::string,InspectorWidgetSource*>::iterator source=sources.begin();source!=sources.end();source++){
+        for(std::map<std::string,Source*>::iterator source=sources.begin();source!=sources.end();source++){
             delete source->second;
         }
         sources.clear();
@@ -263,17 +263,17 @@ private:
     int video_h;
     int video_frame_count;
     std::string path;
-    InspectorWidgetTime start_t,end_t;
-    InspectorWidgetDate start_d;
-    std::map<std::string,InspectorWidgetSource*> sources;
+    Time start_t,end_t;
+    Date start_d;
+    std::map<std::string,Source*> sources;
 };
 
-class InspectorWidgetAnnotationDefinition{
+class AnnotationDefinition{
 public:
-    InspectorWidgetAnnotationDefinition(){}
-    ~InspectorWidgetAnnotationDefinition(){}
-    virtual InspectorWidgetAnnotationTemporalType temporalType(){return INSPECTOR_WIDGET_ANNOTATION_TEMPORAL_NONE;}
-    virtual InspectorWidgetAnnotationValueType valueType(){return INSPECTOR_WIDGET_ANNOTATION_VALUE_NONE;}
+    AnnotationDefinition(){}
+    ~AnnotationDefinition(){}
+    virtual AnnotationTemporalType temporalType(){return ANNOTATION_TEMPORAL_NONE;}
+    virtual AnnotationValueType valueType(){return ANNOTATION_VALUE_NONE;}
     std::string getTest(){return test;}
     std::vector<std::string> getDependencies(){return dependencies;}
     std::string getAction(){return action;}
@@ -290,84 +290,85 @@ private:
     std::vector<std::string> variables;
 };
 
-class InspectorWidgetPipeline{
+class Pipeline{
 public:
-    InspectorWidgetPipeline(){}
-    ~InspectorWidgetPipeline(){}
-    InspectorWidgetAnnotationDefinition* getDefinition(std::string name){return annotation_definitions[name];}
+    Pipeline(){}
+    ~Pipeline(){}
+    AnnotationDefinition* getDefinition(std::string name){return annotation_definitions[name];}
 private:
-    std::map<std::string,InspectorWidgetAnnotationDefinition*> annotation_definitions;
+    std::map<std::string,AnnotationDefinition*> annotation_definitions;
 };
 
-class InspectorWidgetAnalysis{
+class Analysis{
 public:
-    InspectorWidgetAnalysis(){}
-    ~InspectorWidgetAnalysis(){}
+    Analysis(){}
+    ~Analysis(){}
 private:
-    InspectorWidgetPipeline  pipeline;
-    InspectorWidgetCollection* collection;
-    InspectorWidgetAnnotations annotations;
+    Pipeline  pipeline;
+    Collection* collection;
+    Annotations annotations;
     int current_frame;
 };
 
 /// Algorithm to compute one annotation action
-class InspectorWidgetSourceElementProcessor{
+class SourceElementProcessor{
 public:
-    InspectorWidgetSourceElementProcessor(){}
-    ~InspectorWidgetSourceElementProcessor(){}
+    SourceElementProcessor(){}
+    ~SourceElementProcessor(){}
     virtual std::string getName(){return "";}
-    virtual InspectorWidgetAnnotationTemporalType temporalType(){return INSPECTOR_WIDGET_ANNOTATION_TEMPORAL_NONE;}
-    virtual InspectorWidgetAnnotationValueType valueType(){return INSPECTOR_WIDGET_ANNOTATION_VALUE_NONE;}
-    virtual InspectorWidgetSourceType sourceType(){return INSPECTOR_WIDGET_SOURCE_NONE;}
-    virtual InspectorWidgetProcessorType processorType(){return INSPECTOR_WIDGET_PROCESSOR_NONE;}
+    virtual AnnotationTemporalType temporalType(){return ANNOTATION_TEMPORAL_NONE;}
+    virtual AnnotationValueType valueType(){return ANNOTATION_VALUE_NONE;}
+    virtual SourceType sourceType(){return SOURCE_NONE;}
+    virtual ProcessorType processorType(){return PROCESSOR_NONE;}
     virtual bool init(){return false;}
-    virtual bool processElement(InspectorWidgetSourceElement* element){return false;}
-    virtual std::string getAction()=0; // related to InspectorWidgetAnnotationDefinition
-    virtual bool supportsDefinition(InspectorWidgetAnnotationDefinition definition)=0;
+    virtual bool processElement(SourceElement* element){return false;}
+    virtual std::string getAction()=0; // related to AnnotationDefinition
+    virtual bool supportsDefinition(AnnotationDefinition definition)=0;
 };
 
 /// Algorithm to compute several annotation actions that share the same processor type
-class InspectorWidgetSourceElementParser{
-    InspectorWidgetSourceElementParser(){}
-    ~InspectorWidgetSourceElementParser(){}
+class SourceElementParser{
+    SourceElementParser(){}
+    ~SourceElementParser(){}
     virtual std::string getName(){return "";}
-    virtual InspectorWidgetAnnotationTemporalType temporalType(){return INSPECTOR_WIDGET_ANNOTATION_TEMPORAL_NONE;}
-    virtual InspectorWidgetAnnotationValueType valueType(){return INSPECTOR_WIDGET_ANNOTATION_VALUE_NONE;}
-    virtual InspectorWidgetSourceType sourceType(){return INSPECTOR_WIDGET_SOURCE_NONE;}
-    virtual InspectorWidgetProcessorType processorType(){return INSPECTOR_WIDGET_PROCESSOR_NONE;}
+    virtual AnnotationTemporalType temporalType(){return ANNOTATION_TEMPORAL_NONE;}
+    virtual AnnotationValueType valueType(){return ANNOTATION_VALUE_NONE;}
+    virtual SourceType sourceType(){return SOURCE_NONE;}
+    virtual ProcessorType processorType(){return PROCESSOR_NONE;}
     virtual bool init(){return false;}
-    InspectorWidgetSourceElement* getNextElement(InspectorWidgetSourceElement* element){return 0;}
+    SourceElement* getNextElement(SourceElement* element){return 0;}
 };
 
 /// Algorithm to export annotations
-class InspectorWidgetAnnotationExporter{
+class AnnotationExporter{
 public:
-    InspectorWidgetAnnotationExporter(){}
-    ~InspectorWidgetAnnotationExporter(){}
+    AnnotationExporter(){}
+    ~AnnotationExporter(){}
     virtual std::string getName(){return "";}
-    virtual InspectorWidgetAnnotationTemporalType temporalType(){return INSPECTOR_WIDGET_ANNOTATION_TEMPORAL_NONE;}
-    virtual InspectorWidgetAnnotationValueType valueType(){return INSPECTOR_WIDGET_ANNOTATION_VALUE_NONE;}
-    virtual InspectorWidgetSourceType sourceType(){return INSPECTOR_WIDGET_SOURCE_NONE;}
-    virtual InspectorWidgetExportType exportType(){return INSPECTOR_WIDGET_EXPORT_NONE;}
+    virtual AnnotationTemporalType temporalType(){return ANNOTATION_TEMPORAL_NONE;}
+    virtual AnnotationValueType valueType(){return ANNOTATION_VALUE_NONE;}
+    virtual SourceType sourceType(){return SOURCE_NONE;}
+    virtual ExportType exportType(){return EXPORT_NONE;}
     virtual bool openFile(){return false;}
     virtual bool closeFile(){return false;}
     virtual bool exportHeader(){return false;}
-    virtual bool exportElement(InspectorWidgetAnnotationElement* element){return false;}
+    virtual bool exportElement(AnnotationElement* element){return false;}
     virtual bool exportFooter(){return false;}
 };
 
-class InspectorWidgetProcessorNew{
+class ProcessorNew{
 public:
-    InspectorWidgetProcessorNew(){}
-    ~InspectorWidgetProcessorNew(){}
+    ProcessorNew(){}
+    ~ProcessorNew(){}
 private:
-    InspectorWidgetPipeline* pipeline;
-    InspectorWidgetAnalysis* analysis;
-    InspectorWidgetCollection* collection;
-    std::map<std::string,InspectorWidgetSourceElementParser*> source_element_parsers;
-    std::map<std::string,InspectorWidgetSourceElementProcessor*> source_element_processors; // mapped by action
-    std::map<std::string,InspectorWidgetAnnotationExporter*> annotation_exporters;
+    Pipeline* pipeline;
+    Analysis* analysis;
+    Collection* collection;
+    std::map<std::string,SourceElementParser*> source_element_parsers;
+    std::map<std::string,SourceElementProcessor*> source_element_processors; // mapped by action
+    std::map<std::string,AnnotationExporter*> annotation_exporters;
 };
 
+}
 
-#endif //InspectorWidgetProcessorAPI_H
+#endif //ProcessorAPI_H
