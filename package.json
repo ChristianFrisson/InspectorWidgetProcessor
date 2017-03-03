@@ -9,6 +9,6 @@
     },
     "scripts": {
         "preinstall": "./git-clone-submodules.sh",
-         "install": "node rebuild.js"
+        "install": "node rebuild.js && sh ./fixup_bundle.sh build/Release ."
     }
 }
