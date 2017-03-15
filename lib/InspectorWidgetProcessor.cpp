@@ -3640,7 +3640,7 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                 || (isActionActive["getModifierKeysPressed"] && annotationName["getModifierKeysPressed"] == *name)
                 ){
             segmentfilepath = datapath + videostem + std::string("-") + label + std::string("-events.json");
-            eventfooter(*w_s[*name],"input_events",label,this->video_frames,this->fps);
+            eventfooter(*w_s[*name],label,"input_events",this->video_frames,this->fps);
         }
         else if( (isActionActive["getWords"] && annotationName["getWords"] == *name) ){
             segmentfilepath = datapath + videostem + std::string("-") + label + std::string("-segments.json");
