@@ -222,6 +222,12 @@ endif()
 #    NODEJS ADDON    #
 ######################
 
+if(APPLE)
+	set(CMAKE_MACOSX_RPATH TRUE)
+	set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+	list(APPEND CMAKE_INSTALL_RPATH "@loader_path/" "@executable_path/")
+endif()
+
 # Get and apply the cmake-js flags by executing it
 execute_process(COMMAND ${NODE} ${NPM_cmake-js} print-configure -d ${CMAKE_CURRENT_SOURCE_DIR} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} OUTPUT_VARIABLE PC_OUT RESULT_VARIABLE PC_RES)
 #message("${NPM_cmake-js} print-configure -d ${CMAKE_CURRENT_SOURCE_DIR}: ${PC_OUT} // ${PC_RES}")
