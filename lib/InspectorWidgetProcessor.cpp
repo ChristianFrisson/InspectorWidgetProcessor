@@ -2117,7 +2117,9 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                 msg <<  "Constraint '" << _c << "' with action "<< _a << " should have no parameter instead of "<< _avs.size() << ", aborting";
                 return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
             }
-            inputhooks.push_back(_n);
+            if(std::find(inputhooks.begin(),inputhooks.end(),_n) == inputhooks.end()){
+                inputhooks.push_back(_n);
+            }
             inputhook_test[_n] = _t;
             inputhook_deps[_n] = _vs;
             inputhook_action[_n] = _a;
