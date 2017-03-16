@@ -1916,7 +1916,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                 int _y = ceil( _video_h * atof(_avs[1].c_str()) );
                 int _w = int( _video_w * atof(_avs[2].c_str()) );
                 int _h = floor( _video_h * atof(_avs[3].c_str()) );
-                if(_x == 0 || _y == 0 || _w == 0 || _h == 0){
+                if(_w == 0 || _h == 0){
                     _cap.release();
                     std::stringstream msg;
                     msg << "Null dimension(s) for video file " << _videopath << " (x=" << _x << " ,y=" << _y << " ,w=" << _w << " ,h=" << _h <<"), aborting";
