@@ -4204,8 +4204,14 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
                 /// Find the closest preceeding application node
                 for (pugi::xml_node t = closest_node; !t.empty(); t = t.previous_sibling()){
                     if(std::string(t.name()) == "application"){
-                        std::string query = std::string("./AXApplication/AXWindow[@AXTitle='") + n.attribute("title").as_string() + "']";
-                        pugi::xpath_node tpath = t.select_single_node(query.c_str());
+                        std::string query = std::string("./AXApplication/AXWindow[@AXTitle=\"") + n.attribute("title").as_string() + "\"]";
+                        pugi::xpath_node tpath;
+                        try{
+                            tpath = t.select_single_node(query.c_str());
+                        }
+                        catch(pugi::xpath_exception e){
+                            std::cerr << "Could not match a window of the application by its title '" << n.attribute("title").as_string() << "': "<< e.what() << std::endl;
+                        }
 
                         if (tpath)
                         {
