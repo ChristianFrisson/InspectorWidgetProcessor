@@ -113,6 +113,10 @@ struct InspectorWidgetAccessibilityHoverInfo {
     std::string xml_tree_children;
     std::string xml_tree_parents;
     pugi::xml_node xml_node;
+    pugi::xml_node closest_node;
+    pugi::xml_node closest_window_node;
+    pugi::xml_node closest_application_node;
+    pugi::xml_node element_node;
     InspectorWidgetAccessibilityHoverInfo():rect(std::vector<float>()),xml_tree_children(""),xml_tree_parents(""){}
 };
 
@@ -325,6 +329,11 @@ protected:
     std::map<std::string,std::vector<std::string> > ax_deps;
     std::map<std::string,std::string> ax_action;
     std::map<std::string,std::vector<std::string> > ax_variables;
+
+    std::map<std::string, float > ax_x,ax_y,ax_time;
+    std::map<std::string, float> ax_w,ax_h;
+    std::map<std::string, std::string> ax_id;
+    std::vector<std::string> ax_list;
 
     int match_method;
     int max_Trackbar;

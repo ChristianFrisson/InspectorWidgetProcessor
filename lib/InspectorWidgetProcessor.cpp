@@ -482,6 +482,8 @@ InspectorWidgetProcessor::InspectorWidgetProcessor(){
     //supported_accessibility_tests.push_back("during");
     supported_accessibility_tests.push_back(""); // make test statements optional
 
+    supported_accessibility_actions.push_back("matchAccessible");
+    supported_accessibility_actions.push_back("accessible");
     supported_accessibility_actions.push_back("getFocusApplication");
     supported_accessibility_actions.push_back("getFocusWindow");
     supported_accessibility_actions.push_back("getPointedWidget");
@@ -589,6 +591,13 @@ void InspectorWidgetProcessor::clear(){
     ax_deps.clear();
     ax_action.clear();
     ax_variables.clear();
+
+    ax_x.clear();
+    ax_y.clear();
+    ax_w.clear();
+    ax_h.clear();
+    ax_time.clear();
+    ax_id.clear();
 
     ax_hover_time = -1;
     ax_hover_x = -1; /// check with dual monitors
@@ -2099,11 +2108,118 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
         }
         /// Process accessibility statements:
         else if(forAccessibility){
-            ax_annotations.push_back(_n);
-            ax_test[_n] = _t;
-            ax_deps[_n] = _vs;
-            ax_action[_n] = _a;
-            ax_variables[_n] = _avs;
+
+            if(_a == "accessible"){
+                if(_avs.size()!=6){
+                    std::stringstream msg;
+                    msg << "Constraint '" << _c << "' with accessible definition should have 6 parameters instead of "<< _avs.size() << ", aborting";
+                    return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+                }
+                if(_n.empty()){
+                    std::stringstream msg;
+                    msg << "Constraint '" << _c << "' should assign the accessible definition to an accessible name, as in 'name = accessible(...)' , aborting";
+                    return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+                }
+
+                std::string _videourl = _avs[4];
+                std::string _videostem = getStemName(_videourl);
+
+                std::string _videopath = datapath + _videostem + ".mp4";
+                /// Load image and template
+                cv::VideoCapture _cap;
+                _cap.open(_videopath); // open a video file
+                if(!_cap.isOpened())  // check if succeeded
+                {
+                    std::stringstream msg;
+                    msg << "File " << _videopath << " not found or could not be opened";
+                    return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+                }
+                int _video_w = (int)(cap.get(CAP_PROP_FRAME_WIDTH));
+                int _video_h = (int)(cap.get(CAP_PROP_FRAME_HEIGHT));
+                this->video_frames = (int)(cap.get(CAP_PROP_FRAME_COUNT));
+                float _fps = cap.get(CAP_PROP_FPS);
+                if(_video_w == 0 || _video_h == 0 || _fps == 0 || this->video_frames == 0){
+                    _cap.release();
+                    std::stringstream msg;
+                    msg << "Null dimension(s) for video file " << _videopath << " (w=" << _video_w << " ,h=" << _video_h << " ,fps=" << _fps<< " ,frames=" << this->video_frames <<"), aborting";
+                    return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+                }
+
+                int _x = int( _video_w * atof(_avs[0].c_str()) );
+                int _y = ceil( _video_h * atof(_avs[1].c_str()) );
+                int _w = int( _video_w * atof(_avs[2].c_str()) );
+                int _h = floor( _video_h * atof(_avs[3].c_str()) );
+                if(_w == 0 || _h == 0){
+                    _cap.release();
+                    std::stringstream msg;
+                    msg << "Null dimension(s) for video file " << _videopath << " (x=" << _x << " ,y=" << _y << " ,w=" << _w << " ,h=" << _h <<"), aborting";
+                    return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+                }
+                cv::Rect _rect (_x,_y,_w,_h);
+
+                float _t = atof(_avs[5].c_str());
+
+                int _frame_pos = (int)(_t*_fps);
+                if(_frame_pos < 0 || _frame_pos > this->video_frames ){
+                    _cap.release();
+                    std::stringstream msg;
+                    msg << "Frame position incompatible with video file " << _videopath << " : asked=" << _frame_pos << " ,max=" << this->video_frames <<"), aborting";
+                    return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+                }
+
+                _cap.set(CAP_PROP_POS_FRAMES,_frame_pos);
+
+                cv::Mat _frame;
+                bool _frame_read = _cap.read(_frame);
+
+                if(!_frame_read){
+                    _cap.release();
+                    std::stringstream msg;
+                    msg << "Couldn't read the required frame for accessible "<< _n << " in video file " << _videopath <<" , aborting";
+                    return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+                }
+
+                cv::Mat _template = _frame(_rect);
+
+                std::string _templatefile = this->datapath /*+ _videostem + "-"*/ + _n +".png";
+                std::cout << _templatefile << std::endl;
+                bool _frame_written = cv::imwrite(_templatefile.c_str(),_template);
+                if(!_frame_written){
+                    _cap.release();
+                    std::stringstream msg;
+                    msg << "Couldn't save accessible "<< _n << " from video file " << _videopath <<" , aborting";
+                    return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+                }
+
+                ax_x[_n] = atof(_avs[0].c_str());
+                ax_y[_n] = atof(_avs[1].c_str());
+                ax_w[_n] = atof(_avs[2].c_str());
+                ax_h[_n] = atof(_avs[3].c_str());
+                ax_time[_n] = _t;
+                ax_id[_n] = _videostem;
+                //ax_list.push_back(_n); // done by matchAccessible
+
+                _cap.release();
+            }
+            else if (_a == "matchAccessible"){
+                //if(_t.empty()){
+                for(std::vector<std::string>::iterator __av = _avs.begin(); __av != _avs.end(); __av++){
+                    std::vector<std::string>::iterator is_accessible = std::find(ax_list.begin(),ax_list.end(),*__av);
+                    if(is_accessible==ax_list.end()){
+                        ax_list.push_back(*__av);
+                        ax_annotations.push_back(*__av);
+                        ax_action[*__av] = "matchAccessible";
+                    }
+                }
+                //}
+            }
+            else{
+                ax_annotations.push_back(_n);
+                ax_test[_n] = _t;
+                ax_deps[_n] = _vs;
+                ax_action[_n] = _a;
+                ax_variables[_n] = _avs;
+            }
         }
         /// Process hook input statements:
         else if(forInputHooks){
@@ -2324,7 +2440,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
         ax_pre_success = !this->getAccessibilityAnnotations(ax_annotations).empty();
         if(!ax_pre_success){
             std::stringstream msg;
-            msg << "Error during accessibilit events processing, aborting";
+            msg << "Error during accessibility events processing, aborting";
             return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
         }
         stop = getTickCount();
@@ -3878,6 +3994,8 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
     std::string getPointedWidgetAnnotation("");
     bool getWorkspaceSnapshot = false;
     std::string getWorkspaceSnapshotAnnotation("");
+    bool matchAccessible = false;
+    std::vector<std::string> accessiblesToMatch;
 
     for(std::vector<std::string>::iterator name = names.begin(); name != names.end();name++ ){
         s_o[*name] = StringBuffer();
@@ -3888,6 +4006,8 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
         w_s[*name] = _s;
         header(*_o);
         header(*_s);
+
+        std::cout << "name "<< *name << std::endl;
 
         if(ax_action[*name] == "getFocusApplication"){
             getFocusApplication = true;
@@ -3904,6 +4024,123 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
         else if(ax_action[*name] == "getWorkspaceSnapshot"){
             getWorkspaceSnapshot = true;
             getWorkspaceSnapshotAnnotation = *name;
+        }
+        else if(ax_action[*name] == "matchAccessible"){
+            std::cout << "matchAccessible" << std::endl;
+            matchAccessible = true;
+            accessiblesToMatch.push_back(*name);
+        }
+    }
+
+    if(matchAccessible){
+        for(std::vector<std::string>::iterator a = accessiblesToMatch.begin(); a!= accessiblesToMatch.end();a++){
+            float x = ax_x[*a] + 0.5*ax_w[*a];
+            float y = ax_y[*a] + 0.5*ax_h[*a];
+            float t = ax_time[*a];
+            InspectorWidgetAccessibilityHoverInfo info = this->getAccessibilityHover(t,x,y);
+
+            if(!info.element_node.empty()){
+
+                pugi::xml_node _c = info.element_node;
+                std::string indent("");
+                std::string appName,windowName,xPathQuery;
+                while (!_c.parent().empty() && std::string(_c.first_child().name()) != "AXApplication"){
+                    std::string name = _c.name();
+                    std::string title = _c.attribute("AXTitle").as_string();
+                    std::string roleDesc = _c.attribute("AXRoleDescription").as_string();
+                    if(name == "AXAplication"){
+                        appName = title;
+                    }
+                    if(name == "AXWindow"){
+                        windowName = title;
+                    }
+                    xPathQuery = "/" + name + "[@AXTitle=\""+title+"\"]" + "[@AXRoleDescription=\""+roleDesc+"\"]" + xPathQuery;
+
+                    //std::cout << indent << name << " -> title '" << title << "' roleDesc '" << roleDesc << "'" << std::endl;
+
+                    _c = _c.parent();
+                    indent += " ";
+                }
+                xPathQuery = "." + xPathQuery;
+                //std::cout << "xPathQuery " << xPathQuery << std::endl;
+
+                uint64_t _clock,_start_clock;
+                bool appFocusKnown = false;
+                bool windowFocusKnown = false;
+                bool appHasFocus = false;
+                bool windowHasFocus = false;
+                bool elementAlreadyMatched = false;
+                bool elementMatched = false;
+
+                for (pugi::xml_node n: root.children())
+                {
+                    _clock = n.attribute("clock").as_llong();
+                    std::string name = n.name();
+                    //std::cout << name << std::endl;
+                    if(name == "windowEvent"){
+                        windowFocusKnown = false;
+                        std::string query = "./target[@app=\""+appName+"\"][@title=\""+windowName+"\"]";
+                        pugi::xpath_node tpath;
+                        try{
+                            tpath = n.select_single_node(query.c_str());
+                        }
+                        catch(pugi::xpath_exception e){
+                            std::cerr << "Could not match a window of the application by its title '" << n.attribute("title").as_string() << "': "<< e.what() << std::endl;
+                        }
+
+                        if (tpath)
+                        {
+                             windowHasFocus = true;
+                        }
+                        if(!windowHasFocus) elementMatched = false;
+                        //std::cout << "-> focus " << windowHasFocus << std::endl;
+                    }
+                    else if(name == "appchange"){
+                        appFocusKnown = true;
+                        std::string app = n.attribute("name").as_string();
+                        appHasFocus = (app == appName);
+                        if(!appHasFocus) elementMatched = false;
+                        //std::cout << "-> focus " << appHasFocus << std::endl;
+                    }
+                    else if(name == "application"){
+                        elementMatched = false;
+                        pugi::xpath_node tpath;
+                        try{
+                            tpath = n.select_single_node(xPathQuery.c_str());
+                        }
+                        catch(pugi::xpath_exception e){
+                            std::cerr << "Could not match a window of the application by its title '" << n.attribute("title").as_string() << "': "<< e.what() << std::endl;
+                        }
+
+                        if (tpath)
+                        {
+                            if(!elementAlreadyMatched){
+                                _start_clock = _clock;
+                                elementAlreadyMatched = true;
+                            }
+                            elementMatched = true;
+                            //std::cout << "-> matches" << std::endl;
+
+                        }
+
+                    }
+                    if(elementAlreadyMatched && !elementMatched){
+                        elementAlreadyMatched = false;
+                        double _start_t = double(_start_clock - this->start_clock )/1000000000.0;
+                        double _end_t = double(_clock - this->start_clock )/1000000000.0;
+                        segment(*w_s[*a], _start_t*this->fps,_end_t*this->fps,this->fps, *a );
+                        //std::cout << "-> segment" << std::endl;
+                    }
+                }
+                if(elementAlreadyMatched){
+                    elementAlreadyMatched = false;
+                    double _start_t = double(_start_clock - this->start_clock )/1000000000.0;
+                    double _end_t = double(_clock - this->start_clock )/1000000000.0;
+                    segment(*w_s[*a], _start_t*this->fps,_end_t*this->fps,this->fps, *a );
+                    //std::cout << "-> segment" << std::endl;
+                }
+            }
+            segmentfooter(*w_s[*a], *a,"accessibility", this->video_frames, this->fps);
         }
     }
 
@@ -4000,7 +4237,11 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
     for(std::vector<std::string>::iterator name = names.begin(); name != names.end();name++ ){
         std::string label = *name;
         std::ofstream segmentfile;
-        std::string segmentfilepath = datapath + videostem + std::string("-") + label + std::string("-events.json");
+        std::string type = "events";
+        if(ax_action[*name]=="matchAccessible"){
+            type = "segments";
+        }
+        std::string segmentfilepath = datapath + videostem + std::string("-") + label + "-"+type+".json";
         segmentfile.open(segmentfilepath.c_str());
         if(segmentfile.is_open()){
             segmentfile << s_s[*name].GetString();
@@ -4110,6 +4351,7 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
     /// Find the closest node before time
     pugi::xml_node closest_node;// = ax_hover_closest_node;
     pugi::xml_node closest_window_node;// = ax_hover_closest_window_node;
+    pugi::xml_node element_node;
     uint64_t closest_node_clock = 0;
     uint64_t closest_window_node_clock = 0;
     uint64_t closest_application_node_clock = 0;
@@ -4347,7 +4589,7 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
                                     _info.xml_node = c;
                                     _infos[area] = _info;
                                     //std::cout << " area=" << area;
-                                     //std::cout << std::endl;
+                                    //std::cout << std::endl;
                                     _w = _w.first_child();
                                     _tab += " ";
                                     matching_widget = true;
@@ -4369,6 +4611,7 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
                             if(_infos.size()>0){
                                 ax_hover_rect = _infos.begin()->second.rect;
                                 c = _infos.begin()->second.xml_node;
+                                element_node = c;
                             }
                             else{
                                 c = w;
@@ -4441,6 +4684,7 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
     ax_hover_y =_y;
     info.xml_tree_children = axTreeChildren;
     info.xml_tree_parents = axTreeParents;
+    info.element_node = element_node;
     //std::cout << "Parents " << axTreeParents << std::endl;
     std::cout << "- rect "<< ax_hover_rect[0] << " " << ax_hover_rect[1] << " " << ax_hover_rect[2] << " " << ax_hover_rect[3] << " " <<std::endl;
     info.rect = ax_hover_rect;
