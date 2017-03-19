@@ -505,7 +505,6 @@ void InspectorWidgetProcessor::clear(){
     status_progress = -1;
     status_success = "";
     status_error = "";
-    active = false;
     datapath = "";
     videostem = "";
     frame = 0;
@@ -1391,15 +1390,15 @@ bool InspectorWidgetProcessor::setStatusAndReturn(std::string phase, std::string
     }
     else if(!error_message.empty() && success_message.empty()){
         status_error = error_message;
-        status_progress = -1;
-        active = false;
+        //status_progress = -1;
+        //active = false;
         std::cerr << error_message << std::endl;
         return false;
     }
     else{
         status_error = "error";
-        status_progress = -1;
-        active = false;
+        //status_progress = -1;
+        //active = false;
         //throw
         std::cerr << "Unhandled status, aborting" << std::endl;
         return false;
@@ -2574,6 +2573,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
 
 void InspectorWidgetProcessor::abort(){
     this->active = false;
+    this->status_progress = -1;
 }
 
 void InspectorWidgetProcessor::process(){
