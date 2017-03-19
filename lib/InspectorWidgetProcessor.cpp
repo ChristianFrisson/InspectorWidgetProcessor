@@ -1488,17 +1488,18 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
     }
 
     /// Load video and template images
-    cap.open(videopath); // open a video file
-    if(!cap.isOpened())  // check if succeeded
+    cv::VideoCapture _cap;
+    _cap.open(videopath); // open a video file
+    if(!_cap.isOpened())  // check if succeeded
     {
         std::stringstream msg;
         msg << "file " << videopath << " not found or could not be opened";
         return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
     }
-    this->video_w = (int)(cap.get(CAP_PROP_FRAME_WIDTH));
-    this->video_h = (int)(cap.get(CAP_PROP_FRAME_HEIGHT));
-    this->fps = cap.get(CAP_PROP_FPS);
-    this->video_frames = (int)(cap.get(CAP_PROP_FRAME_COUNT));
+    this->video_w = (int)(_cap.get(CAP_PROP_FRAME_WIDTH));
+    this->video_h = (int)(_cap.get(CAP_PROP_FRAME_HEIGHT));
+    this->fps = _cap.get(CAP_PROP_FPS);
+    this->video_frames = (int)(_cap.get(CAP_PROP_FRAME_COUNT));
     if(video_w == 0 || video_h == 0){
         std::stringstream msg;
         msg << "Null dimension(s) for video file " << videopath << " (x=" << video_w << " ,y=" << video_h << "), aborting";
@@ -1912,10 +1913,10 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                     msg << "File " << _videopath << " not found or could not be opened";
                     return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
                 }
-                int _video_w = (int)(cap.get(CAP_PROP_FRAME_WIDTH));
-                int _video_h = (int)(cap.get(CAP_PROP_FRAME_HEIGHT));
-                this->video_frames = (int)(cap.get(CAP_PROP_FRAME_COUNT));
-                float _fps = cap.get(CAP_PROP_FPS);
+                int _video_w = (int)(_cap.get(CAP_PROP_FRAME_WIDTH));
+                int _video_h = (int)(_cap.get(CAP_PROP_FRAME_HEIGHT));
+                this->video_frames = (int)(_cap.get(CAP_PROP_FRAME_COUNT));
+                float _fps = _cap.get(CAP_PROP_FPS);
                 if(_video_w == 0 || _video_h == 0 || _fps == 0 || this->video_frames == 0){
                     _cap.release();
                     std::stringstream msg;
@@ -2140,10 +2141,10 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                     msg << "File " << _videopath << " not found or could not be opened";
                     return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
                 }
-                int _video_w = (int)(cap.get(CAP_PROP_FRAME_WIDTH));
-                int _video_h = (int)(cap.get(CAP_PROP_FRAME_HEIGHT));
-                this->video_frames = (int)(cap.get(CAP_PROP_FRAME_COUNT));
-                float _fps = cap.get(CAP_PROP_FPS);
+                int _video_w = (int)(_cap.get(CAP_PROP_FRAME_WIDTH));
+                int _video_h = (int)(_cap.get(CAP_PROP_FRAME_HEIGHT));
+                this->video_frames = (int)(_cap.get(CAP_PROP_FRAME_COUNT));
+                float _fps = _cap.get(CAP_PROP_FPS);
                 if(_video_w == 0 || _video_h == 0 || _fps == 0 || this->video_frames == 0){
                     _cap.release();
                     std::stringstream msg;
@@ -2579,6 +2580,15 @@ void InspectorWidgetProcessor::process(){
 
     frame = 0;
     //cap.set(CAP_PROP_POS_FRAMES,frame);
+    std::string videopath = datapath + videostem + ".mp4";
+    cap.open(videopath); // open a video file
+    if(!cap.isOpened())  // check if succeeded
+    {
+        std::stringstream msg;
+        msg << "file " << videopath << " not found or could not be opened";
+        setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+        return;
+    }
 
     bool parse_condition;
 
