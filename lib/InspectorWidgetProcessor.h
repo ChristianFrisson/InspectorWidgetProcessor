@@ -150,6 +150,7 @@ public:
     std::vector<std::string> getAccessibilityAnnotations(std::vector<std::string> names);
     std::vector<std::string> getAnnotations(std::vector<std::string> names);
     InspectorWidgetAnnnotationProgress getAnnotation(std::string name);
+    bool extractTemplate(std::string name,float x, float y, float w, float h,std::string id, float time);
     
     /// getAccessibilityHover
     /// time in sec

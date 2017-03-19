@@ -815,6 +815,69 @@ void fastMatchTemplate(cv::Mat& srca,  // The reference image
     res.copyTo(dst);
 }
 
+bool InspectorWidgetProcessor::extractTemplate(std::string name, float x, float y, float w, float h,std::string id, float time){
+    std::string _videopath = datapath + videostem + ".mp4";
+    cv::VideoCapture _cap;
+    _cap.open(_videopath); // open a video file
+    if(!_cap.isOpened())  // check if succeeded
+    {
+        std::stringstream msg;
+        msg << "File " << _videopath << " not found or could not be opened";
+        return setStatusAndReturn(/*phase*/"extractTemplate",/*error*/msg.str(), /*success*/"");
+    }
+    int _video_w = (int)(_cap.get(CAP_PROP_FRAME_WIDTH));
+    int _video_h = (int)(_cap.get(CAP_PROP_FRAME_HEIGHT));
+    int _video_frames = (int)(_cap.get(CAP_PROP_FRAME_COUNT));
+    float _fps = _cap.get(CAP_PROP_FPS);
+    if(_video_w == 0 || _video_h == 0 || _fps == 0 || _video_frames == 0){
+        _cap.release();
+        std::stringstream msg;
+        msg << "Null dimension(s) for video file " << _videopath << " (w=" << _video_w << " ,h=" << _video_h << " ,fps=" << _fps<< " ,frames=" << _video_frames <<"), aborting";
+        return setStatusAndReturn(/*phase*/"extractTemplate",/*error*/msg.str(), /*success*/"");
+    }
+
+    int _x = int( _video_w * x );
+    int _y = ceil( _video_h * y );
+    int _w = int( _video_w * w );
+    int _h = floor( _video_h * h );
+    if(_w == 0 || _h == 0){
+        _cap.release();
+        std::stringstream msg;
+        msg << "Null dimension(s) for video file " << _videopath << " (x=" << _x << " ,y=" << _y << " ,w=" << _w << " ,h=" << _h <<"), aborting";
+        return setStatusAndReturn(/*phase*/"extractTemplate",/*error*/msg.str(), /*success*/"");
+    }
+    cv::Rect _rect (_x,_y,_w,_h);
+
+
+
+    int _frame_pos = (int)(time*_fps);
+    if(_frame_pos < 0 || _frame_pos > _video_frames ){
+        _cap.release();
+        std::stringstream msg;
+        msg << "Frame position incompatible with video file " << _videopath << " : asked=" << _frame_pos << " ,max=" << _video_frames <<"), aborting";
+        return setStatusAndReturn(/*phase*/"extractTemplate",/*error*/msg.str(), /*success*/"");
+    }
+
+    _cap.set(CAP_PROP_POS_FRAMES,_frame_pos);
+
+    cv::Mat _frame;
+    bool _frame_read = _cap.read(_frame);
+
+    if(!_frame_read){
+        _cap.release();
+        std::stringstream msg;
+        msg << "Couldn't read the required frame for template "<< name << " in video file " << _videopath <<" , aborting";
+        return setStatusAndReturn(/*phase*/"extractTemplate",/*error*/msg.str(), /*success*/"");
+    }
+
+    cv::Mat _template = _frame(_rect);
+
+    std::string imagefile = this->datapath + name + ".png";
+    cv::imwrite(imagefile.c_str(),_template);
+
+    return true;
+}
+
 void InspectorWidgetProcessor::matchTemplates(){
 
     cv::cvtColor(img, ref_gray, COLOR_BGR2GRAY);
@@ -1914,12 +1977,12 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                 }
                 int _video_w = (int)(_cap.get(CAP_PROP_FRAME_WIDTH));
                 int _video_h = (int)(_cap.get(CAP_PROP_FRAME_HEIGHT));
-                this->video_frames = (int)(_cap.get(CAP_PROP_FRAME_COUNT));
+                int _video_frames = (int)(_cap.get(CAP_PROP_FRAME_COUNT));
                 float _fps = _cap.get(CAP_PROP_FPS);
-                if(_video_w == 0 || _video_h == 0 || _fps == 0 || this->video_frames == 0){
+                if(_video_w == 0 || _video_h == 0 || _fps == 0 || _video_frames == 0){
                     _cap.release();
                     std::stringstream msg;
-                    msg << "Null dimension(s) for video file " << _videopath << " (w=" << _video_w << " ,h=" << _video_h << " ,fps=" << _fps<< " ,frames=" << this->video_frames <<"), aborting";
+                    msg << "Null dimension(s) for video file " << _videopath << " (w=" << _video_w << " ,h=" << _video_h << " ,fps=" << _fps<< " ,frames=" << _video_frames <<"), aborting";
                     return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
                 }
 
@@ -1938,10 +2001,10 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                 float _t = atof(_avs[5].c_str());
 
                 int _frame_pos = (int)(_t*_fps);
-                if(_frame_pos < 0 || _frame_pos > this->video_frames ){
+                if(_frame_pos < 0 || _frame_pos > _video_frames ){
                     _cap.release();
                     std::stringstream msg;
-                    msg << "Frame position incompatible with video file " << _videopath << " : asked=" << _frame_pos << " ,max=" << this->video_frames <<"), aborting";
+                    msg << "Frame position incompatible with video file " << _videopath << " : asked=" << _frame_pos << " ,max=" << _video_frames <<"), aborting";
                     return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
                 }
 
@@ -2586,7 +2649,7 @@ void InspectorWidgetProcessor::process(){
     {
         std::stringstream msg;
         msg << "file " << videopath << " not found or could not be opened";
-        setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+        setStatusAndReturn(/*phase*/"process",/*error*/msg.str(), /*success*/"");
         return;
     }
 

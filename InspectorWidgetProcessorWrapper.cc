@@ -80,6 +80,7 @@ void InspectorWidgetProcessorWrapper::Init(v8::Local<v8::Object> exports) {
     Nan::SetPrototypeMethod(tpl, "status", Status);
     Nan::SetPrototypeMethod(tpl, "annotationStatus", AnnotationStatus);
     Nan::SetPrototypeMethod(tpl, "accessibilityHover", AccessibilityHover);
+    Nan::SetPrototypeMethod(tpl, "extractTemplate", ExtractTemplate);
 
     constructor.Reset(tpl->GetFunction());
     exports->Set(Nan::New("InspectorWidgetProcessor").ToLocalChecked(), tpl->GetFunction());
@@ -138,7 +139,6 @@ void InspectorWidgetProcessorWrapper::Run(const Nan::FunctionCallbackInfo<v8::Va
     InspectorWidgetProcessorWrapper* obj = ObjectWrap::Unwrap<InspectorWidgetProcessorWrapper>(info.Holder());
 
     Nan::AsyncQueueWorker(new InspectorWidgetProcessorAsyncWorker(callback, obj->getServer() /*new InspectorWidgetProcessor()*/, args ));
-
 
     /*bool success = obj->getServer()->init(args);
 
@@ -313,6 +313,61 @@ void InspectorWidgetProcessorWrapper::AccessibilityHover(const Nan::FunctionCall
         ,axTreeChildren
     };
     callback->Call(8, argv);
+}
+
+void InspectorWidgetProcessorWrapper::ExtractTemplate(const Nan::FunctionCallbackInfo<v8::Value>& info) {
+    int argc = info.Length();
+    if (argc != 8) {
+        Nan::ThrowTypeError("Wrong number of arguments");
+        return;
+    }
+    /*for (int i=0; i<argc-1; i++){
+        if(!info[i]->IsString()){
+            std::stringstream error;
+            error << "Argument " << i << " should be a string";
+            Nan::ThrowTypeError(error.str().c_str());
+            return;
+        }
+    }*/
+    if(!info[argc-1]->IsFunction()){
+        Nan::ThrowTypeError("The last argument should be a callback function");
+        return;
+    }
+
+    std::vector<std::string> args;
+    for (int i=0; i<argc-1; i++){
+        v8::String::Utf8Value arg(info[i]);
+        std::string buffer  = std::string(*arg);
+        //std::cout << "Buffer '" << buffer << "'" << std::endl;
+        args.push_back(buffer);
+    }
+
+    Nan::Callback *callback = new Nan::Callback(info[argc-1].As<v8::Function>());
+
+    InspectorWidgetProcessorWrapper* obj = ObjectWrap::Unwrap<InspectorWidgetProcessorWrapper>(info.Holder());
+
+    v8::Local<v8::Value> error = Nan::Null();
+    if(obj->getServer()){
+        std::string id = args[0];
+        std::string name = args[1];
+        float x = atof(args[2].c_str());
+        float y = atof(args[3].c_str());
+        float w = atof(args[4].c_str());
+        float h = atof(args[5].c_str());
+        float time = atof(args[6].c_str());
+        bool success = obj->getServer()->extractTemplate(name,x,y,w,h,id,time);
+        std::string error_string = success ? "":"Could not extract template";
+        error = Nan::New(error_string.c_str()).ToLocalChecked();
+    }
+    v8::Local<v8::Value> id = Nan::New(args[0]).ToLocalChecked();
+    v8::Local<v8::Value> name = Nan::New(args[1]).ToLocalChecked();
+
+    v8::Local<v8::Value> argv[] = {
+        id
+        ,name
+        ,error
+    };
+    callback->Call(3, argv);
 }
 
 void InspectorWidgetProcessorWrapper::AnnotationStatus(const Nan::FunctionCallbackInfo<v8::Value>& info) {
