@@ -321,14 +321,14 @@ void InspectorWidgetProcessorWrapper::AnnotationStatus(const Nan::FunctionCallba
         Nan::ThrowTypeError("Wrong number of arguments");
         return;
     }
-    if(!info[1]->IsArray()){
+    /*if(!info[1]->IsArray()){
         std::stringstream error;
         error << "Argument 1 should be an array";
         Nan::ThrowTypeError(error.str().c_str());
         return;
-    }
+    }*/
     for (int i=0; i<argc-1; i++){
-        if(i!=1 && !info[i]->IsString()){
+        if(/*i!=1 &&*/ !info[i]->IsString()){
             std::stringstream error;
             error << "Argument " << i << " should be a string";
             Nan::ThrowTypeError(error.str().c_str());
@@ -340,16 +340,14 @@ void InspectorWidgetProcessorWrapper::AnnotationStatus(const Nan::FunctionCallba
         return;
     }
 
-    v8::Local<v8::Array> names = info[1].As<v8::Array>();
+    /*v8::Local<v8::Array> names = info[1].As<v8::Array>();
     std::vector<std::string> _names;
     for (int i=0; i<names->Length(); i++){
         v8::String::Utf8Value name(names->Get(i));
         _names.push_back(*name);
-    }
+    }*/
 
     std::vector<std::string> args;
-
-
     for (int i=1; i<argc-1; i++){
         v8::String::Utf8Value arg(info[i]);
         std::string buffer  = std::string(*arg);
@@ -371,7 +369,13 @@ void InspectorWidgetProcessorWrapper::AnnotationStatus(const Nan::FunctionCallba
         std::string success_string = obj->getServer()->getStatusSuccess();
         std::string phase_string = obj->getServer()->getStatusPhase();
         float progress_float = obj->getServer()->getStatusProgress();
-        std::vector<std::string> annotations_array = obj->getServer()->getAnnotations(_names);
+        //std::vector<std::string> annotations_array = obj->getServer()->getAnnotations(_names);
+        std::cout << " get Annotation from " << args[0] << std::endl;
+        InspectorWidgetAnnnotationProgress info = obj->getServer()->getAnnotation(args[0]);
+        std::vector<std::string> annotations_array;
+        annotations_array.push_back(info.name);
+        annotations_array.push_back(std::to_string(info.progress));
+        annotations_array.push_back(info.annotation);
         //std::cout << "InspectorWidgetProcessorWrapper: error " << error_string  << " success " << success_string << " phase " << phase_string << std::endl;
         error = Nan::New(error_string.c_str()).ToLocalChecked();
         success = Nan::New(success_string).ToLocalChecked();

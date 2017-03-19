@@ -610,6 +610,8 @@ void InspectorWidgetProcessor::clear(){
     ax_hover_closest_node = pugi::xml_node();
     ax_hover_closest_window_node = pugi::xml_node();
     ax_hover_closest_parsed = false;*/
+
+    annotation_progress.clear();
 }
 
 InspectorWidgetProcessor::~InspectorWidgetProcessor(){
@@ -1981,6 +1983,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                             //std::cerr << "Test variable " << *__v << " is neither part of logged templates nor templates to be extracted, aborting" << std::endl;
                             //return 0;
                             template_list.push_back(*__av);
+                            annotation_progress[*__av] = 0.0;
                         }
                     }
                 }
@@ -2014,6 +2017,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                             //std::cerr << "Test variable " << *__v << " is neither part of logged templates nor templates to be extracted, aborting" << std::endl;
                             //return 0;
                             template_list.push_back(*__av);
+                            annotation_progress[*__av] = 0.0;
                         }
                     }
                 }
@@ -2048,6 +2052,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                         //std::cerr << "Test variable " << *__v << " is neither part of logged templates nor templates to be extracted, aborting" << std::endl;
                         //return 0;
                         template_list.push_back(*__v);
+                        annotation_progress[*__v] = 0.0;
                         is_template = true;
                     }
                     if(_a == "matchTemplate"){
@@ -2085,6 +2090,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                                 //std::cerr << "Test variable " << *__v << " is neither part of logged templates nor templates to be extracted, aborting" << std::endl;
                                 //return 0;
                                 template_list.push_back(*__av);
+                                annotation_progress[*__av] = 0.0;
                             }
 
                         }
@@ -2209,6 +2215,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                         ax_list.push_back(*__av);
                         ax_annotations.push_back(*__av);
                         ax_action[*__av] = "matchAccessible";
+                        annotation_progress[*__av] = 0.0;
                     }
                 }
                 //}
@@ -2219,6 +2226,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                 ax_deps[_n] = _vs;
                 ax_action[_n] = _a;
                 ax_variables[_n] = _avs;
+                annotation_progress[_n] = 0.0;
             }
         }
         /// Process hook input statements:
@@ -2240,6 +2248,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
             inputhook_deps[_n] = _vs;
             inputhook_action[_n] = _a;
             inputhook_variables[_n] = _avs;
+            annotation_progress[_n] = 0.0;
         }
     }
 
@@ -2583,6 +2592,12 @@ void InspectorWidgetProcessor::process(){
     while(frame < this->video_frames)
     {
         this->status_progress = (float)frame/(float)this->video_frames;
+        for(std::map<std::string,cv::Mat>::iterator _template = templates.begin(); _template!=templates.end();_template++){
+            annotation_progress[_template->first] = (float)frame/(float)this->video_frames;
+        }
+        for(std::set<std::string>::iterator _text_detection = text_detect_list.begin(); _text_detection!= text_detect_list.end();_text_detection++){
+            annotation_progress[*_text_detection] = (float)frame/(float)this->video_frames;
+        }
         if(!active){
             std::stringstream msg;
             msg << "Abort requested for video file " << videostem << "), aborting";
@@ -2775,6 +2790,12 @@ void InspectorWidgetProcessor::process(){
 
     }
     this->status_progress = (frame == this->video_frames ? 1.0 : 0.0);
+    for(std::map<std::string,cv::Mat>::iterator _template = templates.begin(); _template!=templates.end();_template++){
+        annotation_progress[_template->first] = 1.0;
+    }
+    for(std::set<std::string>::iterator _text_detection = text_detect_list.begin(); _text_detection!= text_detect_list.end();_text_detection++){
+        annotation_progress[*_text_detection] = 1.0;
+    }
 }
 
 
@@ -3915,6 +3936,42 @@ std::vector<std::string> InspectorWidgetProcessor::getAnnotations(std::vector<st
     return annotations;
 }
 
+InspectorWidgetAnnnotationProgress InspectorWidgetProcessor::getAnnotation(std::string name){
+    InspectorWidgetAnnnotationProgress info;
+
+    std::vector<std::string>::iterator _template = std::find(template_list.begin(),template_list.end(),name);
+    std::vector<std::string>::iterator _ax_annotation = std::find(ax_annotations.begin(),ax_annotations.end(),name);
+    std::vector<std::string>::iterator _inputhook = std::find(inputhooks.begin(),inputhooks.end(),name);
+
+    if(_template!=template_list.end()){
+        info.annotation = this->getTemplateAnnotation(name);
+    }
+    else if(_ax_annotation!=ax_annotations.end()){
+        std::vector<std::string> names;
+        names.push_back(name);
+        std::vector<std::string> annotations = this->getAccessibilityAnnotations(names);
+        info.annotation = annotations.front();
+    }
+    else if(_inputhook!=inputhooks.end()){
+        this->hook_path = datapath + videostem + ".txt";
+        std::vector<std::string> names;
+        names.push_back(name);
+        std::vector<std::string> annotations = this->parseHookEvents(this->hook_path,names,true);
+        info.annotation = annotations.front();
+    }
+    else{
+        std::stringstream msg;
+        msg << "Annotation " << name << " is not defined";
+        setStatusAndReturn(/*phase*/"getAnnotation",/*error*/msg.str(), /*success*/"");
+        return info;
+    }
+
+    info.name = name;
+    info.progress = annotation_progress[name];
+
+    return info;
+}
+
 std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(std::vector<std::string> names){
     std::vector<std::string> annotations;
 
@@ -4075,6 +4132,7 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
                 for (pugi::xml_node n: root.children())
                 {
                     _clock = n.attribute("clock").as_llong();
+                    annotation_progress[*a] = double(_clock - this->start_clock ) / double(this->end_clock - this->start_clock );
                     std::string name = n.name();
                     //std::cout << name << std::endl;
                     if(name == "windowEvent"){
@@ -4141,6 +4199,7 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
                 }
             }
             segmentfooter(*w_s[*a], *a,"accessibility", this->video_frames, this->fps);
+            annotation_progress[*a] = 1.0;
         }
     }
 
@@ -4151,6 +4210,7 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
         for (pugi::xml_node n: root.children("appchange"))
         {
             uint64_t _clock = n.attribute("clock").as_llong();
+            annotation_progress[getFocusApplicationAnnotation] = double(_clock - this->start_clock ) / double(this->end_clock - this->start_clock );
             //std::cout << "appchange " << n.attribute("name").as_string();
             if(_clock > this->end_clock){
                 break;
@@ -4162,6 +4222,7 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
             }
         }
         eventfooter(*w_s[getFocusApplicationAnnotation], getFocusApplicationAnnotation,"accessibility", this->video_frames, this->fps);
+        annotation_progress[getFocusApplicationAnnotation] = 1.0;
     }
     if(getFocusWindow){
         uint64_t _last_clock = 0;
@@ -4170,6 +4231,7 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
         {
             /*std::cout << n.attribute("time").as_float() << " ";*/
             uint64_t _clock = n.attribute("clock").as_llong();
+            annotation_progress[getFocusWindowAnnotation] = double(_clock - this->start_clock ) / double(this->end_clock - this->start_clock );
             if(_clock > this->end_clock){
                 break;
             }
@@ -4186,12 +4248,14 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
             }
         }
         eventfooter(*w_s[getFocusWindowAnnotation], getFocusWindowAnnotation, "accessibility", this->video_frames, this->fps);
+        annotation_progress[getFocusWindowAnnotation] = 1.0;
     }
     if(getPointedWidget){
         std::string _name("");
         for (pugi::xml_node n: root.children("mouse"))
         {
             uint64_t _clock = n.attribute("clock").as_llong();
+            annotation_progress[getPointedWidgetAnnotation] = double(_clock - this->start_clock ) / double(this->end_clock - this->start_clock );
             //std::cout << "appchange " << n.attribute("name").as_string();
             if(_clock > this->end_clock){
                 break;
@@ -4216,11 +4280,13 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
             }
         }
         eventfooter(*w_s[getPointedWidgetAnnotation], getPointedWidgetAnnotation,"accessibility",this->video_frames, this->fps);
+        annotation_progress[getPointedWidgetAnnotation] = 1.0;
     }
     if(getWorkspaceSnapshot){
         for (pugi::xml_node n: root.children("application"))
         {
             uint64_t _clock = n.attribute("clock").as_llong();
+            annotation_progress[getWorkspaceSnapshotAnnotation] = double(_clock - this->start_clock ) / double(this->end_clock - this->start_clock );
             //std::cout << "application " << n.attribute("name").as_string();
             if(_clock > this->end_clock){
                 break;
@@ -4232,6 +4298,7 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
             }
         }
         eventfooter(*w_s[getWorkspaceSnapshotAnnotation], getWorkspaceSnapshotAnnotation,"accessibility",this->video_frames, this->fps);
+        annotation_progress[getWorkspaceSnapshotAnnotation] = 1.0;
     }
 
     for(std::vector<std::string>::iterator name = names.begin(); name != names.end();name++ ){

@@ -120,6 +120,13 @@ struct InspectorWidgetAccessibilityHoverInfo {
     InspectorWidgetAccessibilityHoverInfo():rect(std::vector<float>()),xml_tree_children(""),xml_tree_parents(""){}
 };
 
+struct InspectorWidgetAnnnotationProgress {
+    std::string name;
+    std::string annotation;
+    float progress;
+    InspectorWidgetAnnnotationProgress():name(""),annotation(""),progress(0.0){}
+};
+
 class InspectorWidgetProcessor{
     friend class InspectorWidgetProcessorCommandParser::operators;
 
@@ -142,6 +149,7 @@ public:
     std::string getTemplateAnnotation(std::string name);
     std::vector<std::string> getAccessibilityAnnotations(std::vector<std::string> names);
     std::vector<std::string> getAnnotations(std::vector<std::string> names);
+    InspectorWidgetAnnnotationProgress getAnnotation(std::string name);
     
     /// getAccessibilityHover
     /// time in sec
@@ -334,6 +342,8 @@ protected:
     std::map<std::string, float> ax_w,ax_h;
     std::map<std::string, std::string> ax_id;
     std::vector<std::string> ax_list;
+
+    std::map<std::string,float> annotation_progress;
 
     int match_method;
     int max_Trackbar;
