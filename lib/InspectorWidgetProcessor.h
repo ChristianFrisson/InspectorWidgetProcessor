@@ -345,6 +345,10 @@ protected:
     std::vector<std::string> ax_list;
 
     std::map<std::string,float> annotation_progress;
+public:
+    void resetAnnotationProgress(std::string name);
+    bool requiresProcessing(std::string name);
+protected:
 
     int match_method;
     int max_Trackbar;

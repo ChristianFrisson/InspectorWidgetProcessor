@@ -502,7 +502,7 @@ InspectorWidgetProcessor::InspectorWidgetProcessor(){
 
 void InspectorWidgetProcessor::clear(){
     active = false;
-    status_progress = -1;
+    status_progress = 0;
     status_success = "";
     status_error = "";
     datapath = "";
@@ -935,176 +935,181 @@ void InspectorWidgetProcessor::matchTemplates(){
 
         if(template_matching_test[_name].empty()) _match_template = true;
 
+        bool skip = !requiresProcessing(_name);
+
         //if( std::find(template_matching_new_dep_list.begin(),template_matching_new_dep_list.end(),_name) != template_matching_new_dep_list.end() ) _match_template = true;
         //if( std::find(text_detect_new_dep_list.begin(),text_detect_new_dep_list.end(),_name) != text_detect_new_dep_list.end() ) _match_template = true;
 
         //if(_match_template[_name] == true){
-        if(_match_template){
+        if(!skip){
+            if(_match_template){
+                cv::Rect rect;
+                cv::Mat _frame;
+                cv::Mat _template;
+                bool gray = true;
 
-            cv::Rect rect;
-            cv::Mat _frame;
-            cv::Mat _template;
-            bool gray = true;
-
-            if( template_matching_test[_name] == "inrect"){
-                std::vector<int> _rect = this->inrect_map[_name];
-                rect.x = _rect[0];
-                rect.y = _rect[1];
-                rect.width = _rect[2];
-                rect.height = _rect[3];
-            }
-            else if(template_matching_test[_name] == "below" || template_matching_test[_name] == "rightof"){
-
-                std::vector<std::string> deps = template_matching_dep_map[_name];
-                if(deps.size()!=1){
-                    std::cerr << "Template to match '" << _name << "' should have only one dependency for test 'below', not extracting..." << std::endl;
-                    return; //exit(0);
-                    //break;
+                if( template_matching_test[_name] == "inrect"){
+                    std::vector<int> _rect = this->inrect_map[_name];
+                    rect.x = _rect[0];
+                    rect.y = _rect[1];
+                    rect.width = _rect[2];
+                    rect.height = _rect[3];
                 }
-                std::string _depname = deps[0];
+                else if(template_matching_test[_name] == "below" || template_matching_test[_name] == "rightof"){
 
-                std::map<std::string, std::vector<float> >::iterator is_logged = log_val.find(_depname);
-                std::vector<std::string>::iterator is_template = std::find(template_list.begin(),template_list.end(),_depname);
-
-                if(template_matching_test[_name] == "below"){
-                    if(is_logged!=log_val.end()){
-                        rect.x = log_x[_depname][csv_frame];
-                        rect.y = log_y[_depname][csv_frame]+logged_template_h[_depname];
-                        rect.width = logged_template_w[_depname];
-                        rect.height = img.rows - log_y[_depname][csv_frame] - logged_template_h[_depname];
+                    std::vector<std::string> deps = template_matching_dep_map[_name];
+                    if(deps.size()!=1){
+                        std::cerr << "Template to match '" << _name << "' should have only one dependency for test 'below', not extracting..." << std::endl;
+                        return; //exit(0);
+                        //break;
                     }
-                    else if(is_template!=template_list.end()){
-                        rect.x = template_x[_depname];
-                        rect.y = template_y[_depname]+template_h[_depname];
-                        rect.width = template_w[_depname];
-                        rect.height = img.rows - template_y[_depname] - template_h[_depname];
+                    std::string _depname = deps[0];
+
+                    std::map<std::string, std::vector<float> >::iterator is_logged = log_val.find(_depname);
+                    std::vector<std::string>::iterator is_template = std::find(template_list.begin(),template_list.end(),_depname);
+
+                    if(template_matching_test[_name] == "below"){
+                        if(is_logged!=log_val.end()){
+                            rect.x = log_x[_depname][csv_frame];
+                            rect.y = log_y[_depname][csv_frame]+logged_template_h[_depname];
+                            rect.width = logged_template_w[_depname];
+                            rect.height = img.rows - log_y[_depname][csv_frame] - logged_template_h[_depname];
+                        }
+                        else if(is_template!=template_list.end()){
+                            rect.x = template_x[_depname];
+                            rect.y = template_y[_depname]+template_h[_depname];
+                            rect.width = template_w[_depname];
+                            rect.height = img.rows - template_y[_depname] - template_h[_depname];
+                        }
+                        else{
+                            std::cerr << "Test variable " << _depname << " is neither part of logged templates nor templates to be extracted, aborting" << std::endl;
+                            return; //exit(0);
+                        }
+                    }
+                    else if(template_matching_test[_name] == "rightof"){
+                        if(is_logged!=log_val.end()){
+                            rect.x = log_x[_depname][csv_frame]+logged_template_w[_depname];
+                            rect.y = log_y[_depname][csv_frame];
+                            rect.width = img.cols - log_x[_depname][csv_frame] - logged_template_w[_depname];
+                            rect.height = logged_template_h[_depname];
+                        }
+                        else if(is_template!=template_list.end()){
+                            rect.x = template_x[_depname]+template_w[_depname];
+                            rect.y = template_y[_depname];
+                            rect.width = img.cols - template_x[_depname] - template_w[_depname];
+                            rect.height = template_h[_depname];
+                        }
+                        else{
+                            std::cerr << "Test variable " << _depname << " is neither part of logged templates nor templates to be extracted, aborting" << std::endl;
+                            return; //exit(0);
+                        }
+                    }
+                }
+
+                if( template_matching_test[_name] == "inrect" || template_matching_test[_name] == "below" || template_matching_test[_name] == "rightof"){
+                    if(gray){
+                        _frame = ref_gray(rect);
                     }
                     else{
-                        std::cerr << "Test variable " << _depname << " is neither part of logged templates nor templates to be extracted, aborting" << std::endl;
-                        return; //exit(0);
+                        _frame = img(rect);
                     }
+                    std::string imagefile = this->datapath + this->videostem + "-" + _name + ".png";
+                    cv::imwrite(imagefile.c_str(),_frame);
                 }
-                else if(template_matching_test[_name] == "rightof"){
-                    if(is_logged!=log_val.end()){
-                        rect.x = log_x[_depname][csv_frame]+logged_template_w[_depname];
-                        rect.y = log_y[_depname][csv_frame];
-                        rect.width = img.cols - log_x[_depname][csv_frame] - logged_template_w[_depname];
-                        rect.height = logged_template_h[_depname];
-                    }
-                    else if(is_template!=template_list.end()){
-                        rect.x = template_x[_depname]+template_w[_depname];
-                        rect.y = template_y[_depname];
-                        rect.width = img.cols - template_x[_depname] - template_w[_depname];
-                        rect.height = template_h[_depname];
+                else{
+                    if(gray){
+                        _frame = ref_gray;
                     }
                     else{
-                        std::cerr << "Test variable " << _depname << " is neither part of logged templates nor templates to be extracted, aborting" << std::endl;
-                        return; //exit(0);
+                        _frame = img;
                     }
                 }
-            }
 
-            if( template_matching_test[_name] == "inrect" || template_matching_test[_name] == "below" || template_matching_test[_name] == "rightof"){
                 if(gray){
-                    _frame = ref_gray(rect);
+                    _template = gray_templates[_name];
                 }
                 else{
-                    _frame = img(rect);
+                    _template = templates[_name];
                 }
-                std::string imagefile = this->datapath + this->videostem + "-" + _name + ".png";
-                cv::imwrite(imagefile.c_str(),_frame);
-            }
-            else{
-                if(gray){
-                    _frame = ref_gray;
+
+                int fastmatchlevels = 2;
+                if( _frame.cols - _template.cols <= 1 || _frame.rows - _template.rows <= 1 ){ // pyramid removes 1 px per dim
+                    fastmatchlevels = 0;
+                }
+
+                //MatchingMethod( _frame, _template, dst, match_method);
+                fastMatchTemplate(_frame, _template, dst, fastmatchlevels, match_method);
+
+                /// Localizing the best match with minMaxLoc
+                double minVal; double maxVal; Point minLoc; Point maxLoc;
+                double matchVal; Point matchLoc;
+
+                minMaxLoc( dst, &minVal, &maxVal, &minLoc, &maxLoc, Mat() );
+
+                /// For SQDIFF and SQDIFF_NORMED, the best matches are lower values. For all the other methods, the higher the better
+                if( match_method  == TM_SQDIFF || match_method == TM_SQDIFF_NORMED )
+                { matchLoc = minLoc; matchVal = minVal; }
+                else
+                { matchLoc = maxLoc; matchVal = maxVal; }
+
+                std::cout << "Match location for '"<< _name << "': x=" <<  matchLoc.x << " y=" <<  matchLoc.y  << " with minVal=" << minVal << " maxVal=" << maxVal <<" matchVal=" << matchVal <<std::endl;
+
+                if(template_matching_test[_name] == "below" || template_matching_test[_name] == "rightof"){
+
+                    template_x[_name] = rect.x + matchLoc.x;
+                    template_y[_name] = rect.y + matchLoc.y;
+                    template_val[_name] = matchVal;
+
                 }
                 else{
-                    _frame = img;
+
+                    template_x[_name] = matchLoc.x;
+                    template_y[_name] = matchLoc.y;
+                    template_val[_name] = matchVal;
+
+                }
+
+                if(template_vals[_name].size() == 0){
+                    std::cout << "Init storage of values from template " << _name << std::endl;
+                    template_vals[_name].resize(this->video_frames,0.0);
+                }
+
+                template_vals[_name][frame] = matchVal;
+
+                //CF
+
+                if(with_gui && matchVal>_threshold){
+                    cv::rectangle(
+                                img, matchLoc,
+                                cv::Point(matchLoc.x + templates[_name].cols, matchLoc.y + templates[_name].rows),
+                                cv::Scalar(0,255,0), 2
+                                );
+                    cv::floodFill(
+                                img, matchLoc,
+                                cv::Scalar(0), 0,
+                                cv::Scalar(.1),
+                                cv::Scalar(1.)
+                                );
                 }
             }
-
-            if(gray){
-                _template = gray_templates[_name];
-            }
             else{
-                _template = templates[_name];
-            }
-
-            int fastmatchlevels = 2;
-            if( _frame.cols - _template.cols <= 1 || _frame.rows - _template.rows <= 1 ){ // pyramid removes 1 px per dim
-                fastmatchlevels = 0;
-            }
-
-            //MatchingMethod( _frame, _template, dst, match_method);
-            fastMatchTemplate(_frame, _template, dst, fastmatchlevels, match_method);
-
-            /// Localizing the best match with minMaxLoc
-            double minVal; double maxVal; Point minLoc; Point maxLoc;
-            double matchVal; Point matchLoc;
-
-            minMaxLoc( dst, &minVal, &maxVal, &minLoc, &maxLoc, Mat() );
-
-            /// For SQDIFF and SQDIFF_NORMED, the best matches are lower values. For all the other methods, the higher the better
-            if( match_method  == TM_SQDIFF || match_method == TM_SQDIFF_NORMED )
-            { matchLoc = minLoc; matchVal = minVal; }
-            else
-            { matchLoc = maxLoc; matchVal = maxVal; }
-
-            std::cout << "Match location for '"<< _name << "': x=" <<  matchLoc.x << " y=" <<  matchLoc.y  << " with minVal=" << minVal << " maxVal=" << maxVal <<" matchVal=" << matchVal <<std::endl;
-
-            if(template_matching_test[_name] == "below" || template_matching_test[_name] == "rightof"){
-
-                template_x[_name] = rect.x + matchLoc.x;
-                template_y[_name] = rect.y + matchLoc.y;
-                template_val[_name] = matchVal;
+                template_x[_name] = 0;
+                template_y[_name] = 0;
+                template_val[_name] = 0;
 
             }
-            else{
+            file << "," << template_x[_name];
+            file << "," << template_y[_name];
+            file << "," << template_val[_name];
 
-                template_x[_name] = matchLoc.x;
-                template_y[_name] = matchLoc.y;
-                template_val[_name] = matchVal;
+            csvfile[_name] << frame;
+            csvfile[_name] << "," << template_x[_name];
+            csvfile[_name] << "," << template_y[_name];
+            csvfile[_name] << "," << template_val[_name];
+            csvfile[_name] << std::endl;
 
-            }
-            
-            if(template_vals[_name].size() == 0){
-                std::cout << "Init storage of values from template " << _name << std::endl;
-                template_vals[_name].resize(this->video_frames,0.0);
-            }
-            
-            template_vals[_name][frame] = matchVal;
-
-            //CF
-
-            if(with_gui && matchVal>_threshold){
-                cv::rectangle(
-                            img, matchLoc,
-                            cv::Point(matchLoc.x + templates[_name].cols, matchLoc.y + templates[_name].rows),
-                            cv::Scalar(0,255,0), 2
-                            );
-                cv::floodFill(
-                            img, matchLoc,
-                            cv::Scalar(0), 0,
-                            cv::Scalar(.1),
-                            cv::Scalar(1.)
-                            );
-            }
+            annotation_progress[_name] = (float)frame/(float)this->video_frames;
         }
-        else{
-            template_x[_name] = 0;
-            template_y[_name] = 0;
-            template_val[_name] = 0;
-
-        }
-        file << "," << template_x[_name];
-        file << "," << template_y[_name];
-        file << "," << template_val[_name];
-
-        csvfile[_name] << frame;
-        csvfile[_name] << "," << template_x[_name];
-        csvfile[_name] << "," << template_y[_name];
-        csvfile[_name] << "," << template_val[_name];
-        csvfile[_name] << std::endl;
 
     }
 }
@@ -1166,41 +1171,44 @@ bool InspectorWidgetProcessor::detectText(){
         std::string text(" ");
         float x(0.0),y(0.0);
 
-        //if(_detect_text[_name] == true){
-        if(_detect_text == true){
+        bool skip = !requiresProcessing(_name);
+        if(!skip){
 
-            cv::Rect rect;
+            //if(_detect_text[_name] == true){
+            if(_detect_text == true){
 
-            if( text_detect_test[_name] == "inrect"){
-                std::vector<int> _rect = this->inrect_map[_name];
-                rect.x = _rect[0];
-                rect.y = _rect[1];
-                rect.width = _rect[2];
-                rect.height = _rect[3];
-            }
-            else if (text_detect_test[_name] == "between"){
+                cv::Rect rect;
 
-                std::vector<float> _xs,_ys;
-                std::vector<int> _ws,_hs;
-
-                for(std::vector<std::string>::iterator _l = text_detect_logged_dep_map[_name].begin(); _l != text_detect_logged_dep_map[_name].end(); _l++ ){
-                    _xs.push_back( log_x[*_l][csv_frame] );
-                    _ys.push_back( log_y[*_l][csv_frame] );
-                    _ws.push_back( logged_template_w[*_l] );
-                    _hs.push_back( logged_template_h[*_l] );
+                if( text_detect_test[_name] == "inrect"){
+                    std::vector<int> _rect = this->inrect_map[_name];
+                    rect.x = _rect[0];
+                    rect.y = _rect[1];
+                    rect.width = _rect[2];
+                    rect.height = _rect[3];
                 }
-                for(std::vector<std::string>::iterator _l = text_detect_new_dep_map[_name].begin(); _l != text_detect_new_dep_map[_name].end(); _l++ ){
-                    _xs.push_back( template_x[*_l] );
-                    _ys.push_back( template_y[*_l] );
-                    _ws.push_back( template_w[*_l] );
-                    _hs.push_back( template_h[*_l] );
-                }
-                if(_xs.size()!=2 || _ys.size()!=2 ){
-                    std::cerr << "Can only detect text between 2 matched templates" << std::endl;
-                    return false;
-                }
+                else if (text_detect_test[_name] == "between"){
 
-                /*{
+                    std::vector<float> _xs,_ys;
+                    std::vector<int> _ws,_hs;
+
+                    for(std::vector<std::string>::iterator _l = text_detect_logged_dep_map[_name].begin(); _l != text_detect_logged_dep_map[_name].end(); _l++ ){
+                        _xs.push_back( log_x[*_l][csv_frame] );
+                        _ys.push_back( log_y[*_l][csv_frame] );
+                        _ws.push_back( logged_template_w[*_l] );
+                        _hs.push_back( logged_template_h[*_l] );
+                    }
+                    for(std::vector<std::string>::iterator _l = text_detect_new_dep_map[_name].begin(); _l != text_detect_new_dep_map[_name].end(); _l++ ){
+                        _xs.push_back( template_x[*_l] );
+                        _ys.push_back( template_y[*_l] );
+                        _ws.push_back( template_w[*_l] );
+                        _hs.push_back( template_h[*_l] );
+                    }
+                    if(_xs.size()!=2 || _ys.size()!=2 ){
+                        std::cerr << "Can only detect text between 2 matched templates" << std::endl;
+                        return false;
+                    }
+
+                    /*{
                 int i = 0;
                 cv::Rect _rect;
                 _rect.x = _xs[i];
@@ -1225,201 +1233,204 @@ bool InspectorWidgetProcessor::detectText(){
             }*/
 
 
-                // Determining an horizontal region between both templates
+                    // Determining an horizontal region between both templates
 
-                float _l,_t,_b,_r;
+                    float _l,_t,_b,_r;
 
-                if(_xs[0] > _xs[1] ){
-                    _l = _xs[1] + _ws[1];
-                    _r = _xs[0];
+                    if(_xs[0] > _xs[1] ){
+                        _l = _xs[1] + _ws[1];
+                        _r = _xs[0];
+                    }
+                    else{
+                        _l = _xs[0] + _ws[0];
+                        _r = _xs[1];
+                    }
+
+                    // Using the union of heights
+                    //_t = min( _ys[0], _ys[1] );
+                    //_b = max( _ys[0] + _hs[0], _ys[1] + _hs[1] );
+
+                    // Using the intersections of heights
+                    _t = (_ys[0] + _hs[0] < _ys[1] + _hs[1]) ? _ys[0] : _ys[1];
+                    _b = (_ys[0] + _hs[0] < _ys[1] + _hs[1]) ? _ys[0] + _hs[0] : _ys[1] + _hs[1];
+
+
+                    rect.x = _l;
+                    rect.y = _t;
+                    rect.width = _r-_l;
+                    rect.height = _b-_t;
+
                 }
                 else{
-                    _l = _xs[0] + _ws[0];
-                    _r = _xs[1];
+                    std::cerr << "Test " << text_detect_test[_name] << " not implemented for text detection, aborting" << std::endl;
+                    return 0; //exit(0);
                 }
 
-                // Using the union of heights
-                //_t = min( _ys[0], _ys[1] );
-                //_b = max( _ys[0] + _hs[0], _ys[1] + _hs[1] );
-
-                // Using the intersections of heights
-                _t = (_ys[0] + _hs[0] < _ys[1] + _hs[1]) ? _ys[0] : _ys[1];
-                _b = (_ys[0] + _hs[0] < _ys[1] + _hs[1]) ? _ys[0] + _hs[0] : _ys[1] + _hs[1];
-
-
-                rect.x = _l;
-                rect.y = _t;
-                rect.width = _r-_l;
-                rect.height = _b-_t;
-
-            }
-            else{
-                std::cerr << "Test " << text_detect_test[_name] << " not implemented for text detection, aborting" << std::endl;
-                return 0; //exit(0);
-            }
-
-            if(with_gui){
-                cv::Mat imz  = img.clone();
-
-                //            cv::rectangle(
-                //                        imz, cv::Point(_xs[0] , _ys[0]),
-                //                    cv::Point(_xs[0]+_ws[0] , _ys[0]+_hs[0]),
-                //                    cv::Scalar(0,255,0), 2
-                //                    );
-                //            cv::floodFill(
-                //                        imz, cv::Point(_xs[0] , _ys[0]),
-                //                    cv::Scalar(0), 0,
-                //                    cv::Scalar(.1),
-                //                    cv::Scalar(1.)
-                //                    );
-
-                //            cv::rectangle(
-                //                        imz, cv::Point(_xs[1] , _ys[1]),
-                //                    cv::Point(_xs[1]+_ws[1] , _ys[1]+_hs[1]),
-                //                    cv::Scalar(255,0,0), 2
-                //                    );
-                //            cv::floodFill(
-                //                        imz, cv::Point(_xs[1] , _ys[1]),
-                //                    cv::Scalar(0), 0,
-                //                    cv::Scalar(.1),
-                //                    cv::Scalar(1.)
-                //                    );
-
-                cv::rectangle(
-                            imz, rect,
-                            cv::Scalar(0,255,0), 2
-                            );
-                cv::floodFill(
-                            imz, cv::Point(rect.x , rect.y),
-                            cv::Scalar(0), 0,
-                            cv::Scalar(.1),
-                            cv::Scalar(1.)
-                            );
-
-
-                imshow("orig", imz );
-                waitKey(0);
-            }
-
-            cv::Mat image = img(rect);
-            cvtColor( image, image, COLOR_RGB2GRAY);
-
-
-            if(!image.empty()){
-                //namedWindow( text_window, WINDOW_KEEPRATIO | WINDOW_NORMAL );
                 if(with_gui){
-                    imshow(text_window, image );
+                    cv::Mat imz  = img.clone();
+
+                    //            cv::rectangle(
+                    //                        imz, cv::Point(_xs[0] , _ys[0]),
+                    //                    cv::Point(_xs[0]+_ws[0] , _ys[0]+_hs[0]),
+                    //                    cv::Scalar(0,255,0), 2
+                    //                    );
+                    //            cv::floodFill(
+                    //                        imz, cv::Point(_xs[0] , _ys[0]),
+                    //                    cv::Scalar(0), 0,
+                    //                    cv::Scalar(.1),
+                    //                    cv::Scalar(1.)
+                    //                    );
+
+                    //            cv::rectangle(
+                    //                        imz, cv::Point(_xs[1] , _ys[1]),
+                    //                    cv::Point(_xs[1]+_ws[1] , _ys[1]+_hs[1]),
+                    //                    cv::Scalar(255,0,0), 2
+                    //                    );
+                    //            cv::floodFill(
+                    //                        imz, cv::Point(_xs[1] , _ys[1]),
+                    //                    cv::Scalar(0), 0,
+                    //                    cv::Scalar(.1),
+                    //                    cv::Scalar(1.)
+                    //                    );
+
+                    cv::rectangle(
+                                imz, rect,
+                                cv::Scalar(0,255,0), 2
+                                );
+                    cv::floodFill(
+                                imz, cv::Point(rect.x , rect.y),
+                                cv::Scalar(0), 0,
+                                cv::Scalar(.1),
+                                cv::Scalar(1.)
+                                );
+
+
+                    imshow("orig", imz );
                     waitKey(0);
                 }
 
+                cv::Mat image = img(rect);
+                cvtColor( image, image, COLOR_RGB2GRAY);
 
-                if( text_detect_type[_name] == "detectTime" || text_detect_type[_name] == "detectText"){
-                    //CF threshold test
-                    /* 0: Binary
+
+                if(!image.empty()){
+                    //namedWindow( text_window, WINDOW_KEEPRATIO | WINDOW_NORMAL );
+                    if(with_gui){
+                        imshow(text_window, image );
+                        waitKey(0);
+                    }
+
+
+                    if( text_detect_type[_name] == "detectTime" || text_detect_type[_name] == "detectText"){
+                        //CF threshold test
+                        /* 0: Binary
                      1: Binary Inverted
                      2: Threshold Truncated
                      3: Threshold to Zero
                      4: Threshold to Zero Inverted
                    */
 
-                    int threshold_type = 0;
-                    double max_BINARY_value = 255;
-                    double threshold_value = 0.5*255;
+                        int threshold_type = 0;
+                        double max_BINARY_value = 255;
+                        double threshold_value = 0.5*255;
 
-                    threshold( image, image, threshold_value, max_BINARY_value,threshold_type );
-                }
+                        threshold( image, image, threshold_value, max_BINARY_value,threshold_type );
+                    }
 
-                std::string imagefile = this->datapath + this->videostem + "-detecttext.png";
-                cv::imwrite(imagefile.c_str(),image);
+                    std::string imagefile = this->datapath + this->videostem + "-detecttext.png";
+                    cv::imwrite(imagefile.c_str(),image);
 
-                /*std::stringstream patchpath;
+                    /*std::stringstream patchpath;
                 patchpath << datapath << videostem << "-patch-" << csv_frame << ".png";
                 cv::imwrite(patchpath.str(),image);*/
 
-                std::string lang("eng");
-                //std::cout << "Using language " << lang << std::endl;
+                    std::string lang("eng");
+                    //std::cout << "Using language " << lang << std::endl;
 
-                /* Use Tesseract to try to decipher our image */
-                tesseract::TessBaseAPI tesseract_api;
+                    /* Use Tesseract to try to decipher our image */
+                    tesseract::TessBaseAPI tesseract_api;
 
-                tesseract_api.Init(NULL, lang.c_str() );
+                    tesseract_api.Init(NULL, lang.c_str() );
 
-                if( text_detect_type[_name] == "detectNumber"){
-                    //CF digit detection test
-                    tesseract_api.SetPageSegMode(tesseract::PSM_SINGLE_LINE);
-                    bool digitsonly = tesseract_api.SetVariable("tessedit_char_whitelist", "0123456789");
-                    //std::cout << "digitsonly "<< digitsonly << std::endl;
-                }
-                else if( text_detect_type[_name] == "detectTime"){
-                    //CF digit detection test
-                    tesseract_api.SetPageSegMode(tesseract::PSM_SINGLE_LINE);
-                    bool digitsonly = tesseract_api.SetVariable("tessedit_char_whitelist", "0123456789:-.");
-                    //std::cout << "digitsonly "<< digitsonly << std::endl;
-                }
-                else if( text_detect_type[_name] == "detectText"){
-                    tesseract_api.SetPageSegMode(tesseract::PSM_SINGLE_LINE);
-                    bool alphasonly = tesseract_api.SetVariable("tessedit_char_whitelist", "abcdefghijklmnopqrstuvxyz");
-                    //std::cout << "alphasonly "<< alphasonly << std::endl;
-                }
+                    if( text_detect_type[_name] == "detectNumber"){
+                        //CF digit detection test
+                        tesseract_api.SetPageSegMode(tesseract::PSM_SINGLE_LINE);
+                        bool digitsonly = tesseract_api.SetVariable("tessedit_char_whitelist", "0123456789");
+                        //std::cout << "digitsonly "<< digitsonly << std::endl;
+                    }
+                    else if( text_detect_type[_name] == "detectTime"){
+                        //CF digit detection test
+                        tesseract_api.SetPageSegMode(tesseract::PSM_SINGLE_LINE);
+                        bool digitsonly = tesseract_api.SetVariable("tessedit_char_whitelist", "0123456789:-.");
+                        //std::cout << "digitsonly "<< digitsonly << std::endl;
+                    }
+                    else if( text_detect_type[_name] == "detectText"){
+                        tesseract_api.SetPageSegMode(tesseract::PSM_SINGLE_LINE);
+                        bool alphasonly = tesseract_api.SetVariable("tessedit_char_whitelist", "abcdefghijklmnopqrstuvxyz");
+                        //std::cout << "alphasonly "<< alphasonly << std::endl;
+                    }
 
-                //tesseract_api.SetPageSegMode(tesseract::PSM_AUTO_ONLY);
+                    //tesseract_api.SetPageSegMode(tesseract::PSM_AUTO_ONLY);
 
-                tesseract_api.SetImage((uchar*) image.data, image.cols, image.rows, 1, image.cols);
+                    tesseract_api.SetImage((uchar*) image.data, image.cols, image.rows, 1, image.cols);
 
 
-                text = string(tesseract_api.GetUTF8Text());
+                    text = string(tesseract_api.GetUTF8Text());
 
-                //std::cout << "Text: " << text << std::endl;
+                    //std::cout << "Text: " << text << std::endl;
 
-                /* Split the string by whitespace */
-                vector<string> splitted;
-                istringstream iss( text );
-                copy( istream_iterator<string>(iss), istream_iterator<string>(), back_inserter( splitted ) );
+                    /* Split the string by whitespace */
+                    vector<string> splitted;
+                    istringstream iss( text );
+                    copy( istream_iterator<string>(iss), istream_iterator<string>(), back_inserter( splitted ) );
 
-                int n_words = splitted.size();
-                std::cout << n_words << " word(s)" << std::endl;
+                    int n_words = splitted.size();
+                    std::cout << n_words << " word(s)" << std::endl;
 
-                std::cout << "Detected text: '" << text << "'" << std::endl;
+                    std::cout << "Detected text: '" << text << "'" << std::endl;
 
-                if(text.empty())
-                    text = " ";
-
-                text.erase (std::remove(text.begin(), text.end(), '\n'), text.end());
-                text.erase (std::remove(text.begin(), text.end(), ','), text.end());
-
-                if( text_detect_type[_name] == "detectNumber"){
-                    if(n_words!=1){
+                    if(text.empty())
                         text = " ";
+
+                    text.erase (std::remove(text.begin(), text.end(), '\n'), text.end());
+                    text.erase (std::remove(text.begin(), text.end(), ','), text.end());
+
+                    if( text_detect_type[_name] == "detectNumber"){
+                        if(n_words!=1){
+                            text = " ";
+                        }
+                        else{
+                            text = splitted[0];
+                        }
                     }
-                    else{
-                        text = splitted[0];
-                    }
+                    //                else if( text_detect_type[_name] == "detectTime"){
+
+                    //                }
+
+                    std::cout << "Processed text: '" << text << "'" << std::endl;
+                    x = rect.x;
+                    y = rect.y;
+
+
                 }
-                //                else if( text_detect_type[_name] == "detectTime"){
-
-                //                }
-
-                std::cout << "Processed text: '" << text << "'" << std::endl;
-                x = rect.x;
-                y = rect.y;
-
-
             }
+
+            text_txt[_name] = text;
+            text_x[_name] = x;
+            text_y[_name] = y;
+
+            file << "," << text_x[_name];
+            file << "," << text_y[_name];
+            file << "," << text_txt[_name];
+
+            csvfile[_name] << frame;
+            csvfile[_name] << "," << text_x[_name];
+            csvfile[_name] << "," << text_y[_name];
+            csvfile[_name] << "," << text_txt[_name];
+            csvfile[_name] << std::endl;
+
+            annotation_progress[_name] = (float)frame/(float)this->video_frames;
         }
-
-        text_txt[_name] = text;
-        text_x[_name] = x;
-        text_y[_name] = y;
-
-        file << "," << text_x[_name];
-        file << "," << text_y[_name];
-        file << "," << text_txt[_name];
-
-        csvfile[_name] << frame;
-        csvfile[_name] << "," << text_x[_name];
-        csvfile[_name] << "," << text_y[_name];
-        csvfile[_name] << "," << text_txt[_name];
-        csvfile[_name] << std::endl;
 
     }
     return true;
@@ -1440,6 +1451,20 @@ std::string InspectorWidgetProcessor::getStatusPhase(){
 
 float InspectorWidgetProcessor::getStatusProgress(){
     return status_progress;
+}
+
+void InspectorWidgetProcessor::resetAnnotationProgress(std::string name){
+    if(annotation_progress.find(name)==annotation_progress.end()){
+        annotation_progress[name] = 0.0;
+        std::cout << "Reset annotation progress for " << name << std::endl;
+    }
+}
+
+bool InspectorWidgetProcessor::requiresProcessing(std::string name){
+    bool isTemplate = std::find(template_list.begin(),template_list.end(),name)!=template_list.end();
+    bool isDetectedText = std::find(this->text_detect_list.begin(),text_detect_list.end(),name)!=text_detect_list.end();
+    if(!isTemplate && !isDetectedText) return false;
+    return (annotation_progress[name]!=1.0) && (this->status_progress >= annotation_progress[name] );
 }
 
 bool InspectorWidgetProcessor::setStatusAndReturn(std::string phase, std::string error_message, std::string success_message ){
@@ -1939,7 +1964,6 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                 for(std::vector<std::string>::iterator __av = _avs.begin(); __av != _avs.end(); __av++){
                     text_detect_test[*__av] = _t;
                     text_detect_type[*__av] = _a;
-
                 }
             }
 
@@ -2046,7 +2070,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                             //std::cerr << "Test variable " << *__v << " is neither part of logged templates nor templates to be extracted, aborting" << std::endl;
                             //return 0;
                             template_list.push_back(*__av);
-                            annotation_progress[*__av] = 0.0;
+                            this->resetAnnotationProgress(*__av);
                         }
                     }
                 }
@@ -2080,7 +2104,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                             //std::cerr << "Test variable " << *__v << " is neither part of logged templates nor templates to be extracted, aborting" << std::endl;
                             //return 0;
                             template_list.push_back(*__av);
-                            annotation_progress[*__av] = 0.0;
+                            this->resetAnnotationProgress(*__av);
                         }
                     }
                 }
@@ -2115,7 +2139,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                         //std::cerr << "Test variable " << *__v << " is neither part of logged templates nor templates to be extracted, aborting" << std::endl;
                         //return 0;
                         template_list.push_back(*__v);
-                        annotation_progress[*__v] = 0.0;
+                        this->resetAnnotationProgress(*__v);
                         is_template = true;
                     }
                     if(_a == "matchTemplate"){
@@ -2128,6 +2152,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                             _template_matching_new_dep_list.push_back(*__v);
                         }
                         _template_matching_dep_list.push_back(*__v);
+                        this->resetAnnotationProgress(*__v);
                     }
                     else if(_a == "detectText" || _a == "detectNumber" || _a == "detectTime"){
                         if(is_logged!=log_val.end() ){
@@ -2139,6 +2164,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                             _text_detect_new_dep_list.push_back(*__v);
                         }
                         _text_detect_dep_list.push_back(*__v);
+                        this->resetAnnotationProgress(*__v);
                     }
 
                     for(std::vector<std::string>::iterator __av = _avs.begin(); __av != _avs.end(); __av++){
@@ -2153,7 +2179,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                                 //std::cerr << "Test variable " << *__v << " is neither part of logged templates nor templates to be extracted, aborting" << std::endl;
                                 //return 0;
                                 template_list.push_back(*__av);
-                                annotation_progress[*__av] = 0.0;
+                                this->resetAnnotationProgress(*__av);
                             }
 
                         }
@@ -2162,6 +2188,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                             text_detect_new_dep_map[*__av]=_text_detect_new_dep_list;
                             text_detect_logged_dep_map[*__av]=_text_detect_logged_dep_list;
                             text_detect_dep_map[*__av]=_text_detect_dep_list;
+                            this->resetAnnotationProgress(*__av);
                         }
                     }
                 }
@@ -2278,7 +2305,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                         ax_list.push_back(*__av);
                         ax_annotations.push_back(*__av);
                         ax_action[*__av] = "matchAccessible";
-                        annotation_progress[*__av] = 0.0;
+                        this->resetAnnotationProgress(*__av);
                     }
                 }
                 //}
@@ -2289,7 +2316,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                 ax_deps[_n] = _vs;
                 ax_action[_n] = _a;
                 ax_variables[_n] = _avs;
-                annotation_progress[_n] = 0.0;
+                this->resetAnnotationProgress(_n);
             }
         }
         /// Process hook input statements:
@@ -2311,7 +2338,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
             inputhook_deps[_n] = _vs;
             inputhook_action[_n] = _a;
             inputhook_variables[_n] = _avs;
-            annotation_progress[_n] = 0.0;
+            this->resetAnnotationProgress(_n);
         }
     }
 
@@ -2636,7 +2663,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
 
 void InspectorWidgetProcessor::abort(){
     this->active = false;
-    this->status_progress = -1;
+    //this->x = 0;
 }
 
 void InspectorWidgetProcessor::process(){
@@ -2665,12 +2692,16 @@ void InspectorWidgetProcessor::process(){
     while(frame < this->video_frames)
     {
         this->status_progress = (float)frame/(float)this->video_frames;
-        for(std::map<std::string,cv::Mat>::iterator _template = templates.begin(); _template!=templates.end();_template++){
-            annotation_progress[_template->first] = (float)frame/(float)this->video_frames;
+        /*for(std::map<std::string,cv::Mat>::iterator _template = templates.begin(); _template!=templates.end();_template++){
+            if(annotation_progress[_template->first] != 1.0){
+                annotation_progress[_template->first] = (float)frame/(float)this->video_frames;
+            }
         }
         for(std::set<std::string>::iterator _text_detection = text_detect_list.begin(); _text_detection!= text_detect_list.end();_text_detection++){
-            annotation_progress[*_text_detection] = (float)frame/(float)this->video_frames;
-        }
+            if(annotation_progress[*_text_detection] != 1.0){
+                annotation_progress[*_text_detection] = (float)frame/(float)this->video_frames;
+            }
+        }*/
         if(!active){
             std::stringstream msg;
             msg << "Abort requested for video file " << videostem << "), aborting";
@@ -2695,21 +2726,25 @@ void InspectorWidgetProcessor::process(){
         else{
             bool skip_analysis = true;
             while(csv_frame < this->video_frames && skip_analysis){
+                this->status_progress = (float)frame/(float)this->video_frames;
                 file << frame;
 
                 // Match templates
 
                 for(std::map<std::string,std::string >::iterator _template_matching_test = template_matching_test.begin(); _template_matching_test != template_matching_test.end(); _template_matching_test++){
-                    std::cout << "Template matching test '" << _template_matching_test->second << "' empty " << _template_matching_test->second.empty() << " for template '" << _template_matching_test->first << "'" << std::endl;
-                    needsTemplateMatching |= _template_matching_test->second.empty();
+                    needsTemplateMatching |= _template_matching_test->second.empty() && requiresProcessing(_template_matching_test->first);
                 }
                 for(std::list<std::string>::iterator template_matching_logged_dep = template_matching_logged_dep_list.begin(); template_matching_logged_dep != template_matching_logged_dep_list.end();template_matching_logged_dep++){
-                    needsTemplateMatching |= (log_val[*template_matching_logged_dep][csv_frame]>_threshold);
+                    needsTemplateMatching |= (log_val[*template_matching_logged_dep][csv_frame]>_threshold) && requiresProcessing(*template_matching_logged_dep);
                 }
-                needsTemplateMatching |= (template_matching_new_dep_list.size()>0);
-                needsTemplateMatching |= (text_detect_new_dep_list.size()>0);
+                for(std::list<std::string>::iterator template_matching_new_dep = template_matching_new_dep_list.begin(); template_matching_new_dep != template_matching_new_dep_list.end();template_matching_new_dep++){
+                    needsTemplateMatching |= requiresProcessing(*template_matching_new_dep);
+                }
+                for(std::list<std::string>::iterator text_detect_new_dep = text_detect_new_dep_list.begin(); text_detect_new_dep != text_detect_new_dep_list.end();text_detect_new_dep++){
+                    needsTemplateMatching |= requiresProcessing(*text_detect_new_dep);
+                }
                 for(std::vector<std::string>::iterator _name = template_list.begin(); _name != template_list.end(); _name++ ){
-                    needsTemplateMatching |= (inrect_map.find(*_name)!=inrect_map.end());
+                    needsTemplateMatching |= (inrect_map.find(*_name)!=inrect_map.end()) && requiresProcessing(*_name);
                 }
 
                 skip_analysis = !needsTemplateMatching;
@@ -2782,13 +2817,13 @@ void InspectorWidgetProcessor::process(){
                 // Detect text
 
                 for(std::list<std::string>::iterator text_detect_logged_dep = text_detect_logged_dep_list.begin(); text_detect_logged_dep != text_detect_logged_dep_list.end();text_detect_logged_dep++){
-                    needsTextDetection |= (log_val[*text_detect_logged_dep][csv_frame]>_threshold);
+                    needsTextDetection |= (log_val[*text_detect_logged_dep][csv_frame]>_threshold) && requiresProcessing(*text_detect_logged_dep);
                 }
                 for(std::list<std::string>::iterator text_detect_new_dep = text_detect_new_dep_list.begin(); text_detect_new_dep != text_detect_new_dep_list.end();text_detect_new_dep++){
-                    needsTextDetection |= (template_val[*text_detect_new_dep]>_threshold);
+                    needsTextDetection |= (template_val[*text_detect_new_dep]>_threshold) && requiresProcessing(*text_detect_new_dep);
                 }
                 for(std::set<std::string>::iterator _name = text_detect_list.begin(); _name != text_detect_list.end(); _name++ ){
-                    needsTextDetection |= (inrect_map.find(*_name)!=inrect_map.end());
+                    needsTextDetection |= (inrect_map.find(*_name)!=inrect_map.end()) && requiresProcessing(*_name);
                 }
 
                 if(needsTextDetection){
@@ -2862,12 +2897,16 @@ void InspectorWidgetProcessor::process(){
         frame++;
 
     }
-    this->status_progress = (frame == this->video_frames ? 1.0 : 0.0);
-    for(std::map<std::string,cv::Mat>::iterator _template = templates.begin(); _template!=templates.end();_template++){
-        annotation_progress[_template->first] = 1.0;
-    }
-    for(std::set<std::string>::iterator _text_detection = text_detect_list.begin(); _text_detection!= text_detect_list.end();_text_detection++){
-        annotation_progress[*_text_detection] = 1.0;
+    if(active){
+        this->status_progress = (frame == this->video_frames ? 1.0 : 0.0);
+        for(std::map<std::string,cv::Mat>::iterator _template = templates.begin(); _template!=templates.end();_template++){
+            annotation_progress[_template->first] = 1.0;
+            std::cout << "Annotation progress for " << _template->first << ": " << annotation_progress[_template->first] << std::endl;
+        }
+        for(std::set<std::string>::iterator _text_detection = text_detect_list.begin(); _text_detection!= text_detect_list.end();_text_detection++){
+            annotation_progress[*_text_detection] = 1.0;
+            std::cout << "Annotation progress for " << *_text_detection << ": " << annotation_progress[*_text_detection] << std::endl;
+        }
     }
 }
 
@@ -4137,8 +4176,6 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
         header(*_o);
         header(*_s);
 
-        std::cout << "name "<< *name << std::endl;
-
         if(ax_action[*name] == "getFocusApplication"){
             getFocusApplication = true;
             getFocusApplicationAnnotation = *name;
@@ -4221,7 +4258,7 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
 
                         if (tpath)
                         {
-                             windowHasFocus = true;
+                            windowHasFocus = true;
                         }
                         if(!windowHasFocus) elementMatched = false;
                         //std::cout << "-> focus " << windowHasFocus << std::endl;
