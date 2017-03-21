@@ -3726,6 +3726,7 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
     bool keycode_canformword = false;
     std::string keycode_modifier_string = "";
     bool keychar_canformword = false;
+    bool keychar_received = false;
 
     int _frame = 0;
 
@@ -3776,7 +3777,10 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                     std::map<std::string,std::string>::iterator clicks_it = val.find("clicks");
                     if(keycode_it != val.end() || keychar_it != val.end()){
                         cur_event_is_keyboard = true;
+                        keycode_canformword = false;
+                        keychar_canformword = false;
                         if( keychar_it != val.end() ){
+                            keychar_received = true;
                             keychar_str = keychar_it->second;
                             keychar_int = atoi(keychar_str.c_str());
                             keychar_time = ts_now;
@@ -3805,7 +3809,7 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                             }
                             rawcode_time = ts_now;
                         }
-                        if(keycode_time == keychar_time && keychar_canformword/*keycode_canformword*/){
+                        if(/*keycode_time == keychar_time &&*/ keychar_received && keychar_canformword/*keycode_canformword*/){
                             if(word.empty()){
                                 wordin = (ts_now - ts_start)*fps;
                             }
@@ -3833,7 +3837,7 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                         }
                     }
 
-                    if( (prev_event_is_keyboard && !cur_event_is_keyboard) || (cur_event_is_keyboard && !keychar_canformword/*!keycode_canformword*/ ) ){
+                    if( (prev_event_is_keyboard && !cur_event_is_keyboard) || (cur_event_is_keyboard && keychar_received && !keychar_canformword/*!keycode_canformword*/ ) ){
                         //std::cout << "when: " << now->tm_hour << "h " << now->tm_min << "m "  << tm_sec << "s " ;//<< std::endl;
                         //std::cout << "Prev word'" << word << "'" << std::endl;
                         std::string spacey(word);
@@ -3874,6 +3878,7 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
             }
 
         }
+        keychar_received = false;
         r++;
     }
 
