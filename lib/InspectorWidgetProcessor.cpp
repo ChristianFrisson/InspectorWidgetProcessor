@@ -3952,7 +3952,6 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                         spacey.erase (std::remove(spacey.begin(), spacey.end(), ' '), spacey.end());
 
                         if(word.size()>0 && spacey.size()>0){
-                            wordout = (ts_now - ts_start)*fps;
 
                             while(_frame < wordin && _frame < this->video_frames){
                                 _x.push_back(0.0);
