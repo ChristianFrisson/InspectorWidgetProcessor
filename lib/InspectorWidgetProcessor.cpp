@@ -290,7 +290,7 @@ void event(PrettyWriter<StringBuffer>& writer, float in, float fps, std::string 
     writer.String("label");
     writer.String(label.c_str());
     writer.String("tc");
-    writer.String(frames2tc(in,fps).c_str());
+    writer.String(frames2tc(ceil(in)+1,fps).c_str()); // use ceil and +1 so that amalia displays the corresponding video frame
     writer.String("tclevel");
     writer.Double(1.0);
     writer.EndObject();
@@ -302,9 +302,9 @@ void segment(PrettyWriter<StringBuffer>& writer, float in, float out, float fps,
     writer.String("label");
     writer.String(label.c_str());
     writer.String("tcin");
-    writer.String(frames2tc(in,fps).c_str());
+    writer.String(frames2tc(ceil(in)+1,fps).c_str()); // use ceil and +1 so that amalia displays the corresponding video frame
     writer.String("tcout");
-    writer.String(frames2tc(out,fps).c_str());
+    writer.String(frames2tc(ceil(out)+1,fps).c_str()); // use ceil and +1 so that amalia displays the corresponding video frame
     writer.String("tclevel");
     writer.Double(1.0);
     writer.EndObject();
