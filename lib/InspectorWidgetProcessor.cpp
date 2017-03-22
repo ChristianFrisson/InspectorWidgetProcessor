@@ -14,6 +14,47 @@ using namespace rapidjson;
 using namespace std;
 using namespace cv;
 
+bool isComboModifier(int keycodeint){
+    bool _modifier;
+    switch(keycodeint){
+    // Begin Modifier and Control Keys
+    case VC_SHIFT_L: //0x002A
+    case VC_SHIFT_R: //0x0036
+    case VC_CONTROL_L: //0x001D
+    case VC_CONTROL_R: //0x0E1D
+    case VC_ALT_L: //0x0038	// Option or Alt Key
+    case VC_ALT_R: //0x0E38	// Option or Alt Key
+    case VC_META_L: //0x0E5B	// Windows or Command Key
+    case VC_META_R: //0x0E5C	// Windows or Command Key
+    case VC_CONTEXT_MENU: //0x0E5D
+
+    _modifier = true;
+    break;
+
+default:
+    _modifier = false;
+    break;
+
+}
+return _modifier;
+}
+
+bool isTextModifier(int keycodeint){
+    bool _modifier;
+    switch(keycodeint){
+    // Begin Modifier and Control Keys
+    case VC_SHIFT_L: //0x002A
+    case VC_SHIFT_R: //0x0036
+    _modifier = true;
+    break;
+
+default:
+    _modifier = false;
+    break;
+}
+return _modifier;
+}
+
 std::string modifierString(int keycodeint){
     std::string  modifier_string = "";
     switch(keycodeint){
@@ -96,6 +137,9 @@ bool canformword(int keycodeint){
     case VC_X: //0x002D
     case VC_Y: //0x0015
     case VC_Z: //0x002C
+
+    case VC_SHIFT_L: //0x002A
+    case VC_SHIFT_R: //0x0036
 
         _canformword = true;
         break;
@@ -3727,23 +3771,68 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
     std::string keycode_modifier_string = "";
     bool keychar_canformword = false;
     bool keychar_received = false;
+    std::vector<int> combo_modifiers_pressed;
+    bool text_combo_modifier = false;
 
     int _frame = 0;
 
     while (getline(hook_txt,line)) {
-        std::vector<std::string> row = splitconstraint(line,',');
+
+        std::map<std::string,std::string> val;
+        std::string::size_type currentPos = 0;
+        std::string colId(""),colVal(""),colIdSep("=\""),colValSep("\",");
+        std::string::size_type colIdPos = std::string::npos;
+        std::string::size_type colValPos = std::string::npos;
+
+        while (currentPos<line.size() ){
+            colId.clear();
+            colVal.clear();
+        colIdPos = line.find(colIdSep,currentPos);
+        if(colIdPos != std::string::npos){
+            colId = line.substr(currentPos,colIdPos-currentPos);
+            currentPos = colIdPos+colIdSep.size();
+            //std::cout << "colId: " << colId << std::endl;
+        }else{
+            std::stringstream msg;
+            msg << "Malformed hook events file";
+            setStatusAndReturn("parseHookEvents",msg.str(),"");
+            return annotations;
+        }
+        colValPos = line.find(colValSep,currentPos);
+        if(colValPos != std::string::npos){
+            colVal = line.substr(currentPos,colValPos-currentPos);
+            currentPos = colValPos+colValSep.size();
+            //std::cout << "colVal: " << colVal << std::endl;
+        }
+        else if(line[line.size()-1] == '\"'){
+            colVal = line.substr(currentPos,line.size()-1-currentPos);
+            currentPos = line.size();
+            //std::cout << "colVal: " << colVal << std::endl;
+        }else{
+            std::stringstream msg;
+            msg << "Malformed hook events file";
+            setStatusAndReturn("parseHookEvents",msg.str(),"");
+            return annotations;
+        }
+        if(!colId.empty() && !colVal.empty()){
+            val[colId]=colVal;
+        }
+
+        }
+
+        /*std::vector<std::string> row = splitconstraint(line,',');
         std::map<std::string,std::string> val;
         for(std::vector<std::string>::iterator r = row.begin(); r != row.end(); r++){
             std::vector<std::string> col = splitconstraint(*r,'=');
             if(col.size()!=2){
                 std::stringstream msg;
-                std::cerr << "Malformed hook events file";
-                setStatusAndReturn(/*phase*/"parseHookEvents",/*error*/msg.str(), /*success*/"");
+                msg << "Malformed hook events file";
+                setStatusAndReturn("parseHookEvents",msg.str(),"");
                 return annotations;
             }
             val[col[0]] = col[1];
-        }
-        if(row.size()>2){
+        }*/
+        if(val.size()>2){
             std::map<std::string,std::string>::iterator ts_it = val.find(ts);
             if(ts_it != val.end()){
                 bool ts_match = false;
@@ -3775,6 +3864,7 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                     std::map<std::string,std::string>::iterator y_it = val.find("y");
                     std::map<std::string,std::string>::iterator button_it = val.find("button");
                     std::map<std::string,std::string>::iterator clicks_it = val.find("clicks");
+                    std::map<std::string,std::string>::iterator event_it = val.find("event");
                     if(keycode_it != val.end() || keychar_it != val.end()){
                         cur_event_is_keyboard = true;
                         keycode_canformword = false;
@@ -3785,16 +3875,33 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                             keychar_int = atoi(keychar_str.c_str());
                             keychar_time = ts_now;
                             keychar_canformword = canformword(keychar_str);
-                            if(isActionActive["getKeysTyped"]){
+                            if(isActionActive["getKeysTyped"] && event_it->second == "key_type"){
                                 event(*w_s[annotationName["getKeysTyped"]], (ts_now - ts_start)*fps , this->fps, keychar_str);
                             }
                         }
                         if( keycode_it != val.end()  ){
-                            keycode_int = atoi(keycode_it->second.c_str());
+                            std::string keycode_str = keycode_it->second;
+                            size_t keycodehex_pos = keycode_str.find("0x");
+                            if( keycodehex_pos == 0  ){
+                                keycode_int = strtoul(keycode_str.substr(2).c_str(), NULL, 16);
+                            }
+                            else{
+                                keycode_int = atoi(keycode_str.c_str());
+                            }
                             keycode_time = ts_now;
                             keycode_canformword = canformword(keycode_int);
                             keycode_modifier_string = modifierString(keycode_int);
-                            if(!keycode_modifier_string.empty() && isActionActive["getModifierKeysPressed"]){
+                            if(!keycode_modifier_string.empty()){
+                                if(event_it->second == "key_press"){
+                                    combo_modifiers_pressed.push_back(keycode_int);
+                                    text_combo_modifier = (isTextModifier(keycode_int) && combo_modifiers_pressed.size() == 1);
+                                }
+                                if(event_it->second == "key_release"){
+                                    combo_modifiers_pressed.pop_back();
+                                    text_combo_modifier = (isTextModifier(combo_modifiers_pressed.back()) && combo_modifiers_pressed.size() == 1);
+                                }
+                            }
+                            if(!keycode_modifier_string.empty() && isActionActive["getModifierKeysPressed"] && event_it->second == "key_press"){
                                 event(*w_s[annotationName["getModifierKeysPressed"]], (ts_now - ts_start)*fps , this->fps, keycode_modifier_string);
                             }
                         }
@@ -3809,7 +3916,8 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                             }
                             rawcode_time = ts_now;
                         }
-                        if(/*keycode_time == keychar_time &&*/ keychar_received && keychar_canformword/*keycode_canformword*/){
+                        bool combo_text_compatible = (combo_modifiers_pressed.size() == 0 || (combo_modifiers_pressed.size() == 1 && isTextModifier(combo_modifiers_pressed.back())));
+                        if(/*keycode_time == keychar_time &&*/ keychar_received && keychar_canformword && combo_text_compatible/*keycode_canformword*/){
                             if(word.empty()){
                                 wordin = (ts_now - ts_start)*fps;
                             }
