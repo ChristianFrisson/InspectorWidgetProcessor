@@ -207,7 +207,7 @@ vector<string> splitconstraint(const string& s, char sep) {
 
 std::string time2tc(int h, int m, float s){
     std::stringstream tc;
-    if (h>10)
+    if (h>=10)
         tc << h;
     else if(h==0)
         tc << "00";
@@ -215,7 +215,7 @@ std::string time2tc(int h, int m, float s){
         tc << "0" << h;
     tc << ":";
 
-    if (m>10)
+    if (m>=10)
         tc << m;
     else if(m==0)
         tc << "00";
@@ -226,7 +226,7 @@ std::string time2tc(int h, int m, float s){
     tc.precision(4);
     tc << fixed;
 
-    if (s>10)
+    if (s>=10)
         tc << s;
     else
         tc << "0" << s;
