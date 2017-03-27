@@ -425,7 +425,7 @@ void InspectorWidgetProcessorWrapper::AnnotationStatus(const Nan::FunctionCallba
         std::string phase_string = obj->getServer()->getStatusPhase();
         float progress_float = obj->getServer()->getStatusProgress();
         //std::vector<std::string> annotations_array = obj->getServer()->getAnnotations(_names);
-        std::cout << " get Annotation from " << args[0] << std::endl;
+        //std::cout << " get Annotation from " << args[0] << std::endl;
         InspectorWidgetAnnnotationProgress info = obj->getServer()->getAnnotation(args[0]);
         std::vector<std::string> annotations_array;
         annotations_array.push_back(info.name);

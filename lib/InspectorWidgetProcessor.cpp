@@ -14,6 +14,8 @@ using namespace rapidjson;
 using namespace std;
 using namespace cv;
 
+using namespace InspectorWidget;
+
 bool isComboModifier(int keycodeint){
     bool _modifier;
     switch(keycodeint){
@@ -28,15 +30,15 @@ bool isComboModifier(int keycodeint){
     case VC_META_R: //0x0E5C	// Windows or Command Key
     case VC_CONTEXT_MENU: //0x0E5D
 
-    _modifier = true;
-    break;
+        _modifier = true;
+        break;
 
-default:
-    _modifier = false;
-    break;
+    default:
+        _modifier = false;
+        break;
 
-}
-return _modifier;
+    }
+    return _modifier;
 }
 
 bool isTextModifier(int keycodeint){
@@ -45,14 +47,14 @@ bool isTextModifier(int keycodeint){
     // Begin Modifier and Control Keys
     case VC_SHIFT_L: //0x002A
     case VC_SHIFT_R: //0x0036
-    _modifier = true;
-    break;
+        _modifier = true;
+        break;
 
-default:
-    _modifier = false;
-    break;
-}
-return _modifier;
+    default:
+        _modifier = false;
+        break;
+    }
+    return _modifier;
 }
 
 std::string modifierString(int keycodeint){
@@ -512,8 +514,8 @@ InspectorWidgetProcessor::InspectorWidgetProcessor(){
     supported_extraction_actions.push_back("detectTime");
     supported_extraction_actions.push_back("template");
 
-    supported_conversion_tests.push_back("during");
-    supported_conversion_tests.push_back(""); // make test statements optional
+    supported_conversion_tests.push_back("if");
+    //supported_conversion_tests.push_back(""); // make test statements optional
 
     supported_conversion_actions.push_back("matchFirstValueOf");
     supported_conversion_actions.push_back("triggerBySegmentsOf");
@@ -563,6 +565,7 @@ void InspectorWidgetProcessor::clear(){
     end_clock = 0;
     first_minute_frames = -1;
 
+    ts_success = false;
     ts_time.clear();
     ts_clock.clear();
     
@@ -1497,11 +1500,18 @@ float InspectorWidgetProcessor::getStatusProgress(){
     return status_progress;
 }
 
-void InspectorWidgetProcessor::resetAnnotationProgress(std::string name){
+void InspectorWidgetProcessor::resetAnnotationProgress(std::string name,SourceType source_type,AnnotationTemporalType temporal_type,AnnotationValueType value_type){
     if(annotation_progress.find(name)==annotation_progress.end()){
         annotation_progress[name] = 0.0;
-        std::cout << "Reset annotation progress for " << name << std::endl;
+        //std::cout << "Reset annotation progress for " << name << std::endl;
     }
+    if(annotations.find(name)==annotations.end()){
+        annotations[name] = new Annotation(name,source_type,temporal_type,value_type);
+    }
+    else{
+        annotations[name]->clear();
+    }
+    std::cout << "Reset annotation progress for " << name << std::endl;
 }
 
 bool InspectorWidgetProcessor::requiresProcessing(std::string name){
@@ -1555,6 +1565,10 @@ bool InspectorWidgetProcessor::init( int argc, char** argv ){
 
 bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
 
+    status_phase = "init";
+    status_progress = 0;
+    active = true;
+
     std::string _videostem;
     _videostem = getStemName(argv[1]);
     std::size_t underpos = _videostem.find_first_of("_");
@@ -1562,98 +1576,97 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
         _videostem = _videostem.substr(0,underpos);
     if(videostem != _videostem){
         this->clear();
-    }
-    videostem = _videostem;
+        active = true;
 
-    status_phase = "init";
-    status_progress = 0;
-    active = true;
+        videostem = _videostem;
 
-    /// Init lexical parser
-    pegtl::analyze< InspectorWidgetProcessorCommandParser::grammar >();
-    parser_operators = new InspectorWidgetProcessorCommandParser::operators( std::bind( &InspectorWidgetProcessor::s2b, this, std::placeholders::_1), std::bind( &InspectorWidgetProcessor::b2s, this, std::placeholders::_1) );
+        /// Init lexical parser
+        pegtl::analyze< InspectorWidgetProcessorCommandParser::grammar >();
+        parser_operators = new InspectorWidgetProcessorCommandParser::operators( std::bind( &InspectorWidgetProcessor::s2b, this, std::placeholders::_1), std::bind( &InspectorWidgetProcessor::b2s, this, std::placeholders::_1) );
 
-    /// Setup default file path/stem:
-    datapath = argv[0];
+        /// Setup default file path/stem:
+        datapath = argv[0];
 #ifdef WIN32
-    std::string slash("\\");
+        std::string slash("\\");
 #else
-    std::string slash("/");
+        std::string slash("/");
 #endif
-    std::size_t slashpos = datapath.find_last_of(slash);
-    if(slashpos!=datapath.size()-1)
-        datapath += slash;
+        std::size_t slashpos = datapath.find_last_of(slash);
+        if(slashpos!=datapath.size()-1)
+            datapath += slash;
 
-    std::string videopath = datapath + videostem + ".mp4";
-    std::cout << "datapath " << datapath << std::endl;
-    std::cout << "videostem " << videostem << std::endl;
-    std::cout << "videopath " << videopath << std::endl;
+        std::string videopath = datapath + videostem + ".mp4";
+        std::cout << "datapath " << datapath << std::endl;
+        std::cout << "videostem " << videostem << std::endl;
+        std::cout << "videopath " << videopath << std::endl;
 
-    /// Check if date and time are encoded in the filename:
-    std::string _timestamps = videostem;
-    /// split the video filename in a vector by delimiter '-'
-    vector<string> _splitstamps = splitconstraint (_timestamps, '-');
-    if(_splitstamps.size()>=6 & _splitstamps[_splitstamps.size()-6].size() == 4 ){
-        start_d.y = atoi(_splitstamps[_splitstamps.size()-6].substr(0,1).c_str())*1000
-                + atoi(_splitstamps[_splitstamps.size()-6].substr(1,1).c_str())*100
-                + atoi(_splitstamps[_splitstamps.size()-6].substr(2,1).c_str())*10
-                + atoi(_splitstamps[_splitstamps.size()-6].substr(3,1).c_str());
-        start_d.m = atoi(_splitstamps[_splitstamps.size()-5].substr(0,1).c_str())*10
-                + atoi(_splitstamps[_splitstamps.size()-5].substr(1,1).c_str());
-        start_d.d = atoi(_splitstamps[_splitstamps.size()-4].substr(0,1).c_str())*10
-                + atoi(_splitstamps[_splitstamps.size()-4].substr(1,1).c_str());
-        start_t.h = atoi(_splitstamps[_splitstamps.size()-3].substr(0,1).c_str())*10
-                + atoi(_splitstamps[_splitstamps.size()-3].substr(1,1).c_str());
-        start_t.m = atoi(_splitstamps[_splitstamps.size()-2].substr(0,1).c_str())*10
-                + atoi(_splitstamps[_splitstamps.size()-2].substr(1,1).c_str());
-        start_t.s = atoi(_splitstamps[_splitstamps.size()-1].substr(0,1).c_str())*10
-                + atoi(_splitstamps[_splitstamps.size()-1].substr(1,1).c_str());
-    }
-    std::cout << "Timestamp encoded in file name: '" << start_d.y << "/" << start_d.m << "/"  << start_d.d << "' '";
-    std::cout << start_t.h << ":"  << start_t.m << ":"  << start_t.s << "'" << std::endl;
-    if(start_d.y == -1 || start_d.m == -1 || start_d.d == -1 || start_t.h == -1 || start_t.m == -1 || start_t.s == -1 )
-    {
-        std::stringstream msg;
-        msg << "Date and time could not be initialized from filename " << videopath << ", aborting";
-        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
-    }
+        /// Check if date and time are encoded in the filename:
+        std::string _timestamps = videostem;
+        /// split the video filename in a vector by delimiter '-'
+        vector<string> _splitstamps = splitconstraint (_timestamps, '-');
+        if(_splitstamps.size()>=6 & _splitstamps[_splitstamps.size()-6].size() == 4 ){
+            start_d.y = atoi(_splitstamps[_splitstamps.size()-6].substr(0,1).c_str())*1000
+                    + atoi(_splitstamps[_splitstamps.size()-6].substr(1,1).c_str())*100
+                    + atoi(_splitstamps[_splitstamps.size()-6].substr(2,1).c_str())*10
+                    + atoi(_splitstamps[_splitstamps.size()-6].substr(3,1).c_str());
+            start_d.m = atoi(_splitstamps[_splitstamps.size()-5].substr(0,1).c_str())*10
+                    + atoi(_splitstamps[_splitstamps.size()-5].substr(1,1).c_str());
+            start_d.d = atoi(_splitstamps[_splitstamps.size()-4].substr(0,1).c_str())*10
+                    + atoi(_splitstamps[_splitstamps.size()-4].substr(1,1).c_str());
+            start_t.h = atoi(_splitstamps[_splitstamps.size()-3].substr(0,1).c_str())*10
+                    + atoi(_splitstamps[_splitstamps.size()-3].substr(1,1).c_str());
+            start_t.m = atoi(_splitstamps[_splitstamps.size()-2].substr(0,1).c_str())*10
+                    + atoi(_splitstamps[_splitstamps.size()-2].substr(1,1).c_str());
+            start_t.s = atoi(_splitstamps[_splitstamps.size()-1].substr(0,1).c_str())*10
+                    + atoi(_splitstamps[_splitstamps.size()-1].substr(1,1).c_str());
+        }
+        std::cout << "Timestamp encoded in file name: '" << start_d.y << "/" << start_d.m << "/"  << start_d.d << "' '";
+        std::cout << start_t.h << ":"  << start_t.m << ":"  << start_t.s << "'" << std::endl;
+        if(start_d.y == -1 || start_d.m == -1 || start_d.d == -1 || start_t.h == -1 || start_t.m == -1 || start_t.s == -1 )
+        {
+            std::stringstream msg;
+            msg << "Date and time could not be initialized from filename " << videopath << ", aborting";
+            return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+        }
 
-    /// Load video and template images
-    cv::VideoCapture _cap;
-    _cap.open(videopath); // open a video file
-    if(!_cap.isOpened())  // check if succeeded
-    {
-        std::stringstream msg;
-        msg << "file " << videopath << " not found or could not be opened";
-        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
-    }
-    this->video_w = (int)(_cap.get(CAP_PROP_FRAME_WIDTH));
-    this->video_h = (int)(_cap.get(CAP_PROP_FRAME_HEIGHT));
-    this->fps = _cap.get(CAP_PROP_FPS);
-    this->video_frames = (int)(_cap.get(CAP_PROP_FRAME_COUNT));
-    if(video_w == 0 || video_h == 0){
-        std::stringstream msg;
-        msg << "Null dimension(s) for video file " << videopath << " (x=" << video_w << " ,y=" << video_h << "), aborting";
-        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
-    }
+        /// Load video
+        cv::VideoCapture _cap;
+        _cap.open(videopath); // open a video file
+        if(!_cap.isOpened())  // check if succeeded
+        {
+            std::stringstream msg;
+            msg << "file " << videopath << " not found or could not be opened";
+            return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+        }
+        this->video_w = (int)(_cap.get(CAP_PROP_FRAME_WIDTH));
+        this->video_h = (int)(_cap.get(CAP_PROP_FRAME_HEIGHT));
+        this->fps = _cap.get(CAP_PROP_FPS);
+        this->video_frames = (int)(_cap.get(CAP_PROP_FRAME_COUNT));
+        if(video_w == 0 || video_h == 0){
+            std::stringstream msg;
+            msg << "Null dimension(s) for video file " << videopath << " (x=" << video_w << " ,y=" << video_h << "), aborting";
+            return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+        }
 
-    /// Check for existing clock timestamps in tsv file
-    //std::string tspath = datapath + videostem + "/tsv/" + videostem + ".tsv";
-    std::string tspath = datapath + videostem + ".tsv";
-    bool ts_success = this->parseClockTimestampsFile(tspath);
-    if(!ts_success){
-        std::stringstream msg;
-        msg << "Error while parsing clock timestamps file " << tspath << " , aborting";
-        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
-    }
-    this->end_clock = this->ts_clock[this->ts_clock.size()-1];
-    //this->end_clock = this->start_clock + 1000000000*(float(this->video_frames)/float(this->fps));
-    int ts_time_size = this->ts_time.size();
-    int ts_clock_size = this->ts_clock.size();
-    if(this->video_frames - ts_time_size > 1 || this->video_frames - ts_clock_size > 1){
-        std::stringstream msg;
-        msg << "Clock timestamps size " << ts_clock_size << " mismatch with video frame size " << this->video_frames << " , aborting";
-        return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+        /// Check for existing clock timestamps in tsv file
+        //std::string tspath = datapath + videostem + "/tsv/" + videostem + ".tsv";
+        std::string tspath = datapath + videostem + ".tsv";
+        ts_success = this->parseClockTimestampsFile(tspath);
+        if(!ts_success){
+            std::stringstream msg;
+            msg << "Error while parsing clock timestamps file " << tspath << " , aborting";
+            return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+        }
+        this->end_clock = this->ts_clock[this->ts_clock.size()-1];
+        //this->end_clock = this->start_clock + 1000000000*(float(this->video_frames)/float(this->fps));
+        int ts_time_size = this->ts_time.size();
+        int ts_clock_size = this->ts_clock.size();
+        if(this->video_frames - ts_time_size > 1 || this->video_frames - ts_clock_size > 1){
+            std::stringstream msg;
+            msg << "Clock timestamps size " << ts_clock_size << " mismatch with video frame size " << this->video_frames << " , aborting";
+            return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+        }
+
     }
 
     /// Parse remaining arguments
@@ -1796,7 +1809,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                 if(!fmf_success){
                     std::stringstream msg;
                     msg << "Csv file " << cv_csvpath << " didn't contain first minute frame count";
-                    return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
+                    return setStatusAndReturn("init",msg.str(),"");
                 }
             }
         }
@@ -2114,7 +2127,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                             //std::cerr << "Test variable " << *__v << " is neither part of logged templates nor templates to be extracted, aborting" << std::endl;
                             //return 0;
                             template_list.push_back(*__av);
-                            this->resetAnnotationProgress(*__av);
+                            this->resetAnnotationProgress(*__av,SOURCE_CV,ANNOTATION_TEMPORAL_SEGMENT,ANNOTATION_VALUE_FLOAT);
                         }
                     }
                 }
@@ -2148,7 +2161,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                             //std::cerr << "Test variable " << *__v << " is neither part of logged templates nor templates to be extracted, aborting" << std::endl;
                             //return 0;
                             template_list.push_back(*__av);
-                            this->resetAnnotationProgress(*__av);
+                            this->resetAnnotationProgress(*__av,SOURCE_CV,ANNOTATION_TEMPORAL_SEGMENT,ANNOTATION_VALUE_FLOAT);
                         }
                     }
                 }
@@ -2183,7 +2196,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                         //std::cerr << "Test variable " << *__v << " is neither part of logged templates nor templates to be extracted, aborting" << std::endl;
                         //return 0;
                         template_list.push_back(*__v);
-                        this->resetAnnotationProgress(*__v);
+                        this->resetAnnotationProgress(*__v,SOURCE_CV,ANNOTATION_TEMPORAL_SEGMENT,ANNOTATION_VALUE_FLOAT);
                         is_template = true;
                     }
                     if(_a == "matchTemplate"){
@@ -2196,7 +2209,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                             _template_matching_new_dep_list.push_back(*__v);
                         }
                         _template_matching_dep_list.push_back(*__v);
-                        this->resetAnnotationProgress(*__v);
+                        this->resetAnnotationProgress(*__v,SOURCE_CV,ANNOTATION_TEMPORAL_SEGMENT,ANNOTATION_VALUE_FLOAT);
                     }
                     else if(_a == "detectText" || _a == "detectNumber" || _a == "detectTime"){
                         if(is_logged!=log_val.end() ){
@@ -2208,7 +2221,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                             _text_detect_new_dep_list.push_back(*__v);
                         }
                         _text_detect_dep_list.push_back(*__v);
-                        this->resetAnnotationProgress(*__v);
+                        this->resetAnnotationProgress(*__v,SOURCE_CV,ANNOTATION_TEMPORAL_SEGMENT,ANNOTATION_VALUE_STRING);
                     }
 
                     for(std::vector<std::string>::iterator __av = _avs.begin(); __av != _avs.end(); __av++){
@@ -2223,7 +2236,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                                 //std::cerr << "Test variable " << *__v << " is neither part of logged templates nor templates to be extracted, aborting" << std::endl;
                                 //return 0;
                                 template_list.push_back(*__av);
-                                this->resetAnnotationProgress(*__av);
+                                this->resetAnnotationProgress(*__av,SOURCE_CV,ANNOTATION_TEMPORAL_SEGMENT,ANNOTATION_VALUE_FLOAT);
                             }
 
                         }
@@ -2232,7 +2245,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                             text_detect_new_dep_map[*__av]=_text_detect_new_dep_list;
                             text_detect_logged_dep_map[*__av]=_text_detect_logged_dep_list;
                             text_detect_dep_map[*__av]=_text_detect_dep_list;
-                            this->resetAnnotationProgress(*__av);
+                            this->resetAnnotationProgress(*__av,SOURCE_CV,ANNOTATION_TEMPORAL_SEGMENT,ANNOTATION_VALUE_STRING);
                         }
                     }
                 }
@@ -2349,7 +2362,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                         ax_list.push_back(*__av);
                         ax_annotations.push_back(*__av);
                         ax_action[*__av] = "matchAccessible";
-                        this->resetAnnotationProgress(*__av);
+                        this->resetAnnotationProgress(*__av,SOURCE_AX,ANNOTATION_TEMPORAL_SEGMENT,ANNOTATION_VALUE_STRING);
                     }
                 }
                 //}
@@ -2360,7 +2373,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
                 ax_deps[_n] = _vs;
                 ax_action[_n] = _a;
                 ax_variables[_n] = _avs;
-                this->resetAnnotationProgress(_n);
+                this->resetAnnotationProgress(_n,SOURCE_AX,ANNOTATION_TEMPORAL_EVENT,ANNOTATION_VALUE_STRING);
             }
         }
         /// Process hook input statements:
@@ -2382,7 +2395,13 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
             inputhook_deps[_n] = _vs;
             inputhook_action[_n] = _a;
             inputhook_variables[_n] = _avs;
-            this->resetAnnotationProgress(_n);
+            if(_a == "getWords"){
+                this->resetAnnotationProgress(_n,SOURCE_INPUT_HOOK,ANNOTATION_TEMPORAL_SEGMENT,ANNOTATION_VALUE_STRING);
+            }
+            else{
+                this->resetAnnotationProgress(_n,SOURCE_INPUT_HOOK,ANNOTATION_TEMPORAL_EVENT,ANNOTATION_VALUE_STRING);
+            }
+
         }
     }
 
@@ -2566,7 +2585,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
     bool hi_pre_success = false;
     if(needsHookEvents){
         this->hook_path = datapath + videostem + ".txt";
-        hi_pre_success = !this->parseHookEvents(hook_path,inputhooks,ts_success).empty();
+        hi_pre_success = !this->computeInputEventsAnnotations(hook_path,inputhooks,ts_success).empty();
         if(!hi_pre_success){
             std::stringstream msg;
             msg << "Error during hook input processing, aborting";
@@ -2580,7 +2599,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
     }
     bool ax_pre_success = false;
     if(needsAccessibility){
-        ax_pre_success = !this->getAccessibilityAnnotations(ax_annotations).empty();
+        ax_pre_success = !this->computeAccessibilityAnnotations(ax_annotations).empty();
         if(!ax_pre_success){
             std::stringstream msg;
             msg << "Error during accessibility events processing, aborting";
@@ -2601,7 +2620,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
     }
 
     /// Process extraction constraints over the video frames
-    this->process();
+    this->computeComputerVisionAnnotations();
     stop = getTickCount();
     time = (double)(stop-start)/frequency;
     std::cout << "Time taken to process extraction constraints: " << time << std::endl;
@@ -2646,7 +2665,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
         /// Process hook input constraints
         if(needsHookEvents && !hi_pre_success){
             this->hook_path = datapath + videostem + ".txt";
-            bool hi_post_success = !this->parseHookEvents(hook_path,inputhooks,false).empty();
+            bool hi_post_success = !this->computeInputEventsAnnotations(hook_path,inputhooks,false).empty();
             if(!hi_post_success){
                 std::stringstream msg;
                 msg << "Error during hook input processing, aborting";
@@ -2661,7 +2680,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
 
         /// Process accessibility constraints
         if(needsAccessibility && !ax_pre_success){
-            bool ax_post_success = !this->getAccessibilityAnnotations(ax_annotations).empty();
+            bool ax_post_success = !this->computeAccessibilityAnnotations(ax_annotations).empty();
             if(!ax_post_success){
                 std::stringstream msg;
                 msg << "Error during accessibility processing, aborting";
@@ -2710,7 +2729,7 @@ void InspectorWidgetProcessor::abort(){
     //this->x = 0;
 }
 
-void InspectorWidgetProcessor::process(){
+void InspectorWidgetProcessor::computeComputerVisionAnnotations(){
 
     frame = 0;
     //cap.set(CAP_PROP_POS_FRAMES,frame);
@@ -3390,7 +3409,6 @@ bool InspectorWidgetProcessor::applyFilterings(){
 
             }
             else if( filtering_action[*filter] == "matchFirstValueOf" ){
-
                 std::string _filtering_dep = _filtering_deps[0];
                 std::string _filtering_variable = _filtering_variables[0];
                 int frames = log_val[_filtering_dep].size();
@@ -3682,21 +3700,21 @@ bool InspectorWidgetProcessor::checkHookEvents(std::string hook_path){
     return true;
 }
 
-std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string hook_path, std::vector<std::string> names, bool using_clocktime){
-    std::vector<std::string> annotations;
+std::vector<std::string> InspectorWidgetProcessor::computeInputEventsAnnotations(std::string hook_path, std::vector<std::string> names, bool using_clocktime){
+    std::vector<std::string> _annotations;
     std::ifstream hook_txt;
     hook_txt.open(hook_path.c_str());
     if(!hook_txt.is_open()){
         std::stringstream msg;
         msg <<  "Couldn't open hook input file " << hook_path;
         setStatusAndReturn(/*phase*/"parseHookEvents",/*error*/msg.str(), /*success*/"");
-        return annotations;
+        return _annotations;
     }
     if(!hook_txt.is_open()){
         std::stringstream msg;
         std::cerr <<  "Couldn't open hook input file " << hook_path;
         setStatusAndReturn(/*phase*/"parseHookEvents",/*error*/msg.str(), /*success*/"");
-        return annotations;
+        return _annotations;
     }
     hook_txt.seekg(ios::beg);
 
@@ -3706,7 +3724,7 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
             std::stringstream msg;
             std::cerr <<  *name << "is not part of registered input hook definitions in the pipeline, aborting";
             setStatusAndReturn(/*phase*/"parseHookEvents",/*error*/msg.str(), /*success*/"");
-            return annotations;
+            return _annotations;
         }
     }
 
@@ -3787,36 +3805,36 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
         while (currentPos<line.size() ){
             colId.clear();
             colVal.clear();
-        colIdPos = line.find(colIdSep,currentPos);
-        if(colIdPos != std::string::npos){
-            colId = line.substr(currentPos,colIdPos-currentPos);
-            currentPos = colIdPos+colIdSep.size();
-            //std::cout << "colId: " << colId << std::endl;
-        }else{
-            std::stringstream msg;
-            msg << "Malformed hook events file";
-            setStatusAndReturn("parseHookEvents",msg.str(),"");
-            return annotations;
-        }
-        colValPos = line.find(colValSep,currentPos);
-        if(colValPos != std::string::npos){
-            colVal = line.substr(currentPos,colValPos-currentPos);
-            currentPos = colValPos+colValSep.size();
-            //std::cout << "colVal: " << colVal << std::endl;
-        }
-        else if(line[line.size()-1] == '\"'){
-            colVal = line.substr(currentPos,line.size()-1-currentPos);
-            currentPos = line.size();
-            //std::cout << "colVal: " << colVal << std::endl;
-        }else{
-            std::stringstream msg;
-            msg << "Malformed hook events file";
-            setStatusAndReturn("parseHookEvents",msg.str(),"");
-            return annotations;
-        }
-        if(!colId.empty() && !colVal.empty()){
-            val[colId]=colVal;
-        }
+            colIdPos = line.find(colIdSep,currentPos);
+            if(colIdPos != std::string::npos){
+                colId = line.substr(currentPos,colIdPos-currentPos);
+                currentPos = colIdPos+colIdSep.size();
+                //std::cout << "colId: " << colId << std::endl;
+            }else{
+                std::stringstream msg;
+                msg << "Malformed hook events file";
+                setStatusAndReturn("parseHookEvents",msg.str(),"");
+                return _annotations;
+            }
+            colValPos = line.find(colValSep,currentPos);
+            if(colValPos != std::string::npos){
+                colVal = line.substr(currentPos,colValPos-currentPos);
+                currentPos = colValPos+colValSep.size();
+                //std::cout << "colVal: " << colVal << std::endl;
+            }
+            else if(line[line.size()-1] == '\"'){
+                colVal = line.substr(currentPos,line.size()-1-currentPos);
+                currentPos = line.size();
+                //std::cout << "colVal: " << colVal << std::endl;
+            }else{
+                std::stringstream msg;
+                msg << "Malformed hook events file";
+                setStatusAndReturn("parseHookEvents",msg.str(),"");
+                return _annotations;
+            }
+            if(!colId.empty() && !colVal.empty()){
+                val[colId]=colVal;
+            }
 
         }
 
@@ -3828,7 +3846,7 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                 std::stringstream msg;
                 msg << "Malformed hook events file";
                 setStatusAndReturn("parseHookEvents",msg.str(),"");
-                return annotations;
+                return _annotations;
             }
             val[col[0]] = col[1];
         }*/
@@ -3876,6 +3894,7 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                             keychar_time = ts_now;
                             keychar_canformword = canformword(keychar_str);
                             if(isActionActive["getKeysTyped"] && event_it->second == "key_type"){
+                                this->annotations[annotationName["getKeysTyped"]]->addElement( new AnnotationStringEvent((ts_now - ts_start),keychar_str));
                                 event(*w_s[annotationName["getKeysTyped"]], (ts_now - ts_start)*fps , this->fps, keychar_str);
                             }
                         }
@@ -3905,6 +3924,7 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                                 }
                             }
                             if(!keycode_modifier_string.empty() && isActionActive["getModifierKeysPressed"] && event_it->second == "key_press"){
+                                this->annotations[annotationName["getModifierKeysPressed"]]->addElement( new AnnotationStringEvent((ts_now - ts_start),keycode_modifier_string));
                                 event(*w_s[annotationName["getModifierKeysPressed"]], (ts_now - ts_start)*fps , this->fps, keycode_modifier_string);
                             }
                         }
@@ -3944,6 +3964,7 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                         bool clicked = (clicks_it->second == "1");
                         std::string button = "Button: "+ button_it->second;
                         if(clicked && isActionActive["getPointerClicks"]){
+                            this->annotations[annotationName["getPointerClicks"]]->addElement( new AnnotationStringEvent((ts_now - ts_start),button));
                             event(*w_s[annotationName["getPointerClicks"]], (ts_now - ts_start)*fps , this->fps, button);
                         }
                     }
@@ -3970,6 +3991,7 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                             }
 
                             if(isActionActive["getWords"]){
+                                this->annotations[annotationName["getWords"]]->addElement( new AnnotationStringSegment(wordin/fps,wordout/fps,word));
                                 segment(*w_s[annotationName["getWords"]], wordin, wordout, this->fps, word);
                                 //overlay(*w_o[wordshook], wordin, wordout, this->fps, __x/(float)video_w, __y/(float)video_h, 20/(float)video_w, 20/(float)video_h, word);
                                 //std::cout << "word '" << word << "' @ " << wordin << " " << wordout << std::endl;
@@ -4016,7 +4038,7 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
             segmentfile << s_s[*name].GetString();
             segmentfile.close();
         }
-        annotations.push_back(s_s[*name].GetString());
+        _annotations.push_back(s_s[*name].GetString());
         delete(w_o[*name]);
         delete(w_s[*name]);
     }
@@ -4031,7 +4053,7 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
     time = (double)(stop-start)/frequency;
     std::cout << "Time taken to parse hook events and save jsons: " << time << std::endl;
 
-    return annotations;
+    return _annotations;
 }
 
 std::string InspectorWidgetProcessor::getTemplateAnnotation(std::string name){
@@ -4147,20 +4169,90 @@ std::vector<std::string> InspectorWidgetProcessor::getAnnotations(std::vector<st
         if(!_annotation.empty()) annotations.push_back( _annotation );
     }
     for(std::vector<std::string>::iterator _ax_annotation = _ax_annotations.begin();_ax_annotation!=_ax_annotations.end();_ax_annotation++){
-        std::vector<std::string> _annotations = this->getAccessibilityAnnotations(_ax_annotations);
+        std::vector<std::string> _annotations = this->computeAccessibilityAnnotations(_ax_annotations);
         for(std::vector<std::string>::iterator _annotation = _annotations.begin(); _annotation != _annotations.end(); _annotation++){
             if(!_annotation->empty())  annotations.push_back(*_annotation);
         }
     }
     if(!_inputhooks.empty()){
         this->hook_path = datapath + videostem + ".txt";
-        std::vector<std::string> _annotations = this->parseHookEvents(this->hook_path,_inputhooks,true);
+        std::vector<std::string> _annotations = this->computeInputEventsAnnotations(this->hook_path,_inputhooks,true);
         for(std::vector<std::string>::iterator _annotation = _annotations.begin(); _annotation != _annotations.end(); _annotation++){
             if(!_annotation->empty())  annotations.push_back(*_annotation);
         }
     }
 
     return annotations;
+}
+
+InspectorWidgetAnnnotationProgress InspectorWidgetProcessor::exportAnnotationForAmalia(std::string name){
+    InspectorWidgetAnnnotationProgress info;
+    if(this->annotations.find(name)!=annotations.end()){
+        AnnotationTemporalType temporal_type = annotations[name]->temporalType();
+        AnnotationValueType value_type = annotations[name]->valueType();
+        SourceType source_type = annotations[name]->sourceType();
+        std::string source;
+        if(source_type == SOURCE_AX){
+            source = "accessibility";
+        }
+        else if(source_type == SOURCE_CV){
+            source = "computer_vision";
+        }
+        else if(source_type == SOURCE_INPUT_HOOK){
+            source = "input_events";
+        }
+        StringBuffer s_s;
+        PrettyWriter<StringBuffer>* w_s = new PrettyWriter<StringBuffer>(s_s);
+        float _out = 0;
+        header(*w_s);
+        AnnotationElement* e = annotations[name]->getFirstElement();
+        for(;e!=0;e=annotations[name]->getNextElement(e)){
+            float _in = e->getStartTime()*this->fps;
+            if(temporal_type == ANNOTATION_TEMPORAL_EVENT){
+                if(value_type == ANNOTATION_VALUE_STRING){
+                    AnnotationStringEvent* se = dynamic_cast<AnnotationStringEvent*>(e);
+                    if(se){
+                        _out = _in;
+                        event(*w_s, _in, this->fps, se->getValue());
+                    }
+                }
+                else if(value_type == ANNOTATION_VALUE_FLOAT){
+                    AnnotationFloatEvent* fe = dynamic_cast<AnnotationFloatEvent*>(e);
+                    if(fe){
+                        _out = _in;
+                        event(*w_s, _in, this->fps, std::to_string(fe->getValue()));
+                    }
+                }
+            }
+            else if(temporal_type == ANNOTATION_TEMPORAL_SEGMENT){
+                //segment(*w_s, _in, f, this->fps, name);
+                if(value_type == ANNOTATION_VALUE_STRING){
+                    AnnotationStringSegment* ss = dynamic_cast<AnnotationStringSegment*>(e);
+                    if(ss){
+                        _out = (ss->getStopTime())*this->fps;
+                        segment(*w_s, _in, _out, this->fps, ss->getValue());
+                    }
+                }
+                else if(value_type == ANNOTATION_VALUE_FLOAT){
+                    AnnotationFloatSegment* fs = dynamic_cast<AnnotationFloatSegment*>(e);
+                    if(fs){
+                        _out = (fs->getStopTime())*this->fps;
+                        segment(*w_s, _in, _out, this->fps, std::to_string(fs->getValue()));
+                    }
+                }
+            }
+        }
+        if(temporal_type == ANNOTATION_TEMPORAL_EVENT){
+            eventfooter(*w_s, name,source, _out, this->fps);
+        }
+        else if(temporal_type == ANNOTATION_TEMPORAL_SEGMENT){
+            segmentfooter(*w_s, name,source, _out, this->fps);
+        }
+        info.name = name;
+        info.progress = annotation_progress[name];
+        info.annotation = s_s.GetString();
+    }
+    return info;
 }
 
 InspectorWidgetAnnnotationProgress InspectorWidgetProcessor::getAnnotation(std::string name){
@@ -4174,17 +4266,11 @@ InspectorWidgetAnnnotationProgress InspectorWidgetProcessor::getAnnotation(std::
         info.annotation = this->getTemplateAnnotation(name);
     }
     else if(_ax_annotation!=ax_annotations.end()){
-        std::vector<std::string> names;
-        names.push_back(name);
-        std::vector<std::string> annotations = this->getAccessibilityAnnotations(names);
-        info.annotation = annotations.front();
+        info = this->exportAnnotationForAmalia(name);
     }
     else if(_inputhook!=inputhooks.end()){
         this->hook_path = datapath + videostem + ".txt";
-        std::vector<std::string> names;
-        names.push_back(name);
-        std::vector<std::string> annotations = this->parseHookEvents(this->hook_path,names,true);
-        info.annotation = annotations.front();
+        info = this->exportAnnotationForAmalia(name);
     }
     else{
         std::stringstream msg;
@@ -4199,7 +4285,7 @@ InspectorWidgetAnnnotationProgress InspectorWidgetProcessor::getAnnotation(std::
     return info;
 }
 
-std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(std::vector<std::string> names){
+std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotations(std::vector<std::string> names){
     std::vector<std::string> annotations;
 
     /// Check if names are listed in registered input hook definitions in the pipeline
@@ -4411,6 +4497,7 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
                         elementAlreadyMatched = false;
                         double _start_t = double(_start_clock - this->start_clock )/1000000000.0;
                         double _end_t = double(_clock - this->start_clock )/1000000000.0;
+                        this->annotations[*a]->addElement( new AnnotationStringSegment(_start_t,_end_t,*a));
                         segment(*w_s[*a], _start_t*this->fps,_end_t*this->fps,this->fps, *a );
                         //std::cout << "-> segment" << std::endl;
                     }
@@ -4419,6 +4506,7 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
                     elementAlreadyMatched = false;
                     double _start_t = double(_start_clock - this->start_clock )/1000000000.0;
                     double _end_t = double(_clock - this->start_clock )/1000000000.0;
+                    this->annotations[*a]->addElement( new AnnotationStringSegment(_start_t,_end_t,*a));
                     segment(*w_s[*a], _start_t*this->fps,_end_t*this->fps,this->fps, *a );
                     //std::cout << "-> segment" << std::endl;
                 }
@@ -4443,6 +4531,7 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
             if(_clock > this->start_clock && _clock < this->end_clock){
                 _name = n.attribute("name").as_string();
                 double _event_t = double(_clock - this->start_clock )/1000000000.0;
+                this->annotations[getFocusApplicationAnnotation]->addElement( new AnnotationStringEvent(_event_t,_name));
                 event(*w_s[getFocusApplicationAnnotation], _event_t*this->fps,this->fps, _name );
             }
         }
@@ -4467,6 +4556,7 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
                     _title = t.attribute("title").as_string();
                     double _event_t = double(_clock - this->start_clock )/1000000000.0;
                     //std::cout << "focus '" << t.attribute("title").as_string() << "':'" << t.attribute("app").as_string() << "' ";
+                    this->annotations[getFocusWindowAnnotation]->addElement( new AnnotationStringEvent(_event_t,_title));
                     event(*w_s[getFocusWindowAnnotation], _event_t*this->fps, this->fps, _title );
                 }
                 _last_clock = _clock;
@@ -4501,6 +4591,7 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
                 catch(...){
                     std::cout << "Bad xpath" << std::endl;
                 }
+                this->annotations[getPointedWidgetAnnotation]->addElement( new AnnotationStringEvent(_event_t,_name));
                 event(*w_s[getPointedWidgetAnnotation], _event_t*this->fps, this->fps, _name );
             }
         }
@@ -4519,6 +4610,7 @@ std::vector<std::string> InspectorWidgetProcessor::getAccessibilityAnnotations(s
             if(_clock > this->start_clock && _clock < this->end_clock){
                 double _event_t = double(_clock - this->start_clock )/1000000000.0;
                 //std::cout << "application";
+                this->annotations[getWorkspaceSnapshotAnnotation]->addElement( new AnnotationStringEvent(_event_t,getWorkspaceSnapshotAnnotation));
                 event(*w_s[getWorkspaceSnapshotAnnotation], _event_t*this->fps, this->fps, getWorkspaceSnapshotAnnotation );
             }
         }

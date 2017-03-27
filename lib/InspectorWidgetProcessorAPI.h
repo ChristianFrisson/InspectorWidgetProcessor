@@ -7,6 +7,10 @@
 #ifndef ProcessorAPI_H
 #define ProcessorAPI_H
 
+#include <iostream>
+#include <vector>
+#include <map>
+
 namespace InspectorWidget {
 
 // Enum types not likely to be complemented anytime soon
@@ -87,26 +91,49 @@ enum FileType{
     FILE_JSON = 5
 };
 
+struct Date {
+    int y;
+    int m;
+    int d;
+    Date():y(-1),m(-1),d(-1){}
+    bool operator==(const Date& _d)
+    {
+        return ( _d.y == y && _d.m == m && _d.d == d);
+    }
+};
+
+struct Time {
+    int h;
+    int m;
+    float s;
+    Time():h(-1),m(-1),s(-1){}
+    bool operator==(const Time& _t)
+    {
+        return ( _t.h == h && _t.m == m && _t.s == s);
+    }
+};
+
 /// Annotation element
 class AnnotationElement{
 public:
-    AnnotationElement(int time):time(time){}
+    AnnotationElement(float _time):start_time(_time){}
     ~AnnotationElement(){}
     virtual AnnotationTemporalType temporalType(){return ANNOTATION_TEMPORAL_NONE;}
     virtual AnnotationValueType valueType(){return ANNOTATION_VALUE_NONE;}
-    int getTime(){return time;}
+    float getStartTime(){return start_time;}
 protected:
-    int time;
+    float start_time;
 };
 
 /// Annotation event with float values
 class AnnotationFloatEvent : public AnnotationElement{
 public:
-    AnnotationFloatEvent(int time, float value)
-        :AnnotationElement(time),value(value) {}
+    AnnotationFloatEvent(float _time, float value)
+        :AnnotationElement(_time),value(value) {}
     ~AnnotationFloatEvent(){}
     virtual AnnotationTemporalType temporalType(){return ANNOTATION_TEMPORAL_EVENT;}
     virtual AnnotationValueType valueType(){return ANNOTATION_VALUE_FLOAT;}
+    float getValue(){return this->value;}
 private:
     float value;
 };
@@ -114,11 +141,12 @@ private:
 /// Annotation event with string values
 class AnnotationStringEvent : public AnnotationElement{
 public:
-    AnnotationStringEvent(int time, std::string value)
+    AnnotationStringEvent(float time, std::string value)
         :AnnotationElement(time),value(value) {}
     ~AnnotationStringEvent(){}
     virtual AnnotationTemporalType temporalType(){return ANNOTATION_TEMPORAL_EVENT;}
     virtual AnnotationValueType valueType(){return ANNOTATION_VALUE_STRING;}
+    std::string getValue(){return this->value;}
 private:
     std::string value;
 };
@@ -126,69 +154,117 @@ private:
 /// Annotation segment with string values
 class AnnotationStringSegment : public AnnotationElement{
 public:
-    AnnotationStringSegment(int start_time, int stop_time, std::string value)
+    AnnotationStringSegment(float start_time, float stop_time, std::string value)
         :AnnotationElement(start_time),stop_time(stop_time),value(value) {}
     ~AnnotationStringSegment(){}
     virtual AnnotationTemporalType temporalType(){return ANNOTATION_TEMPORAL_SEGMENT;}
     virtual AnnotationValueType valueType(){return ANNOTATION_VALUE_STRING;}
+    float getStopTime(){return this->stop_time;}
+    std::string getValue(){return this->value;}
 private:
-    int stop_time;
+    float stop_time;
     std::string value;
 };
 
 /// Annotation segment with float values
 class AnnotationFloatSegment : public AnnotationElement{
 public:
-    AnnotationFloatSegment(int start_time, int stop_time, float value)
+    AnnotationFloatSegment(float start_time, float stop_time, float value)
         :AnnotationElement(start_time),stop_time(stop_time),value(value) {}
     ~AnnotationFloatSegment(){}
     virtual AnnotationTemporalType temporalType(){return ANNOTATION_TEMPORAL_SEGMENT;}
     virtual AnnotationValueType valueType(){return ANNOTATION_VALUE_FLOAT;}
+    float getStopTime(){return this->stop_time;}
+    float getValue(){return this->value;}
 private:
-    int stop_time;
+    float stop_time;
     float value;
 };
 
+typedef std::vector<AnnotationElement*> AnnotationElements;
+
 /// Annotation container
-class Annotation{
+class AbstractAnnotation{
 public:
-    Annotation(){}
-    virtual ~Annotation(){this->clear();}
+    AbstractAnnotation(){}
+    virtual ~AbstractAnnotation(){this->clear();}
 
     virtual std::string getName(){return "";}
+    virtual SourceType sourceType(){return SOURCE_NONE;}
     virtual AnnotationTemporalType temporalType(){return ANNOTATION_TEMPORAL_NONE;}
     virtual AnnotationValueType valueType(){return ANNOTATION_VALUE_NONE;}
 
     bool addElement(AnnotationElement* element){
         if(!element) return false;
-        elements[element->getTime()] = element;
+        elements.push_back(element);
         return true;
     }
-    AnnotationElement* getElement(int time){return elements[time];}
+    AnnotationElement* getFirstElement(){return elements.size()>0?elements.front():0;}
+    AnnotationElement* getNextElement(AnnotationElement* element){
+        if(!element) return 0;
+        AnnotationElements::iterator it = std::find(elements.begin(),elements.end(),element);
+        if(++it==elements.end()) return 0;
+        return *it;
+    }
+    AnnotationElement* getElement(float time){return elements[time];}
     void clear(){
-        for(std::map<int,AnnotationElement*>::iterator element=elements.begin();element!=elements.end();element++){
-            delete element->second;
+        for(AnnotationElements::iterator element=elements.begin();element!=elements.end();element++){
+            delete *element;
         }
         elements.clear();
     }
+    int size(){return elements.size();}
 
 private:
-    std::map<int,AnnotationElement*> elements;
+    AnnotationElements elements;
 };
 
-typedef std::map<std::string,Annotation> Annotations;
+class Annotation : public AbstractAnnotation{
+public:
+    Annotation()
+        :AbstractAnnotation(),
+          value_type(ANNOTATION_VALUE_NONE),
+          temporal_type(ANNOTATION_TEMPORAL_NONE),
+          name("")
+    {}
+    Annotation(std::string _name,SourceType _source_type, AnnotationTemporalType _temporal_type,AnnotationValueType _value_type)
+        :AbstractAnnotation(),
+          name(_name),
+          source_type(_source_type),
+          temporal_type(_temporal_type),
+          value_type(_value_type)
+    {}
+    virtual ~Annotation(){}
+
+    virtual std::string getName(){return this->name;}
+    void setName(std::string _name){this->name=_name;}
+    virtual SourceType sourceType(){return source_type;}
+    virtual AnnotationTemporalType temporalType(){return temporal_type;}
+    virtual AnnotationValueType valueType(){return value_type;}
+    void setSourceType(SourceType _type){this->source_type=_type;}
+    void setTemporalType(AnnotationTemporalType _type){this->temporal_type=_type;}
+    void setValueType(AnnotationValueType _type){this->value_type=_type;}
+
+private:
+    SourceType source_type;
+    AnnotationTemporalType temporal_type;
+    AnnotationValueType value_type;
+    std::string name;
+};
+
+typedef std::map<std::string,AbstractAnnotation*> Annotations;
 
 /// Source element
 class SourceElement{
 public:
-    SourceElement(int time):time(time){}
+    SourceElement(float time):time(time){}
     ~SourceElement(){}
     virtual SourceType sourceType(){return SOURCE_NONE;}
     virtual FileType fileType(){return FILE_NONE;}
     virtual ProcessorType processorType(){return PROCESSOR_NONE;}
-    int getTime(){return time;}
+    float getTime(){return time;}
 protected:
-    int time;
+    float time;
 };
 
 /// Source container

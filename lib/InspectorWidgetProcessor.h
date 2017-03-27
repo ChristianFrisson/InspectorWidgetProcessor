@@ -7,6 +7,8 @@
 #ifndef InspectorWidgetProcessor_H
 #define InspectorWidgetProcessor_H
 
+#include "InspectorWidgetProcessorAPI.h"
+
 #include <istream>
 #include <iostream>
 #include <algorithm>
@@ -147,8 +149,8 @@ public:
     float getElapsedSeconds(float timestamp);
 
     std::string getTemplateAnnotation(std::string name);
-    std::vector<std::string> getAccessibilityAnnotations(std::vector<std::string> names);
     std::vector<std::string> getAnnotations(std::vector<std::string> names);
+    InspectorWidgetAnnnotationProgress exportAnnotationForAmalia(std::string name);
     InspectorWidgetAnnnotationProgress getAnnotation(std::string name);
     bool extractTemplate(std::string name,float x, float y, float w, float h,std::string id, float time);
     
@@ -174,15 +176,17 @@ public:
 
     bool init( int argc, char** argv );
     bool init( std::vector<std::string> );
-    void process();
+
     void abort();
     void clear();
 
     bool parseComputerVisionEvents(PCP::CsvConfig* cv_csv);
+    void computeComputerVisionAnnotations();
     bool parseClockTimestampsFile(std::string _path);
     bool parseFirstMinuteFrameFile(PCP::CsvConfig* fmf_csv);
+    std::vector<std::string> computeAccessibilityAnnotations(std::vector<std::string> names);
     bool checkHookEvents(std::string hook_path);
-    std::vector<std::string> parseHookEvents(std::string hook_path, std::vector<std::string> names, bool using_clocktime);
+    std::vector<std::string> computeInputEventsAnnotations(std::string hook_path, std::vector<std::string> names, bool using_clocktime);
     bool parseFilterings( std::vector<std::string>& filtering_list);
     bool applyFilterings();
 
@@ -281,6 +285,7 @@ protected:
     uint64 start_clock;
     uint64 end_clock;
 
+    bool ts_success;
     std::map<int, uint64> ts_time;
     std::map<int, uint64> ts_clock;
 
@@ -345,8 +350,10 @@ protected:
     std::vector<std::string> ax_list;
 
     std::map<std::string,float> annotation_progress;
+
+    InspectorWidget::Annotations annotations;
 public:
-    void resetAnnotationProgress(std::string name);
+    void resetAnnotationProgress(std::string name,InspectorWidget::SourceType source_type,InspectorWidget::AnnotationTemporalType temporal_type,InspectorWidget::AnnotationValueType value_type);
     bool requiresProcessing(std::string name);
 protected:
 
