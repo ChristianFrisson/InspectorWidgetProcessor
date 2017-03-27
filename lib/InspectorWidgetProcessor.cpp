@@ -3893,12 +3893,15 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                             keycode_modifier_string = modifierString(keycode_int);
                             if(!keycode_modifier_string.empty()){
                                 if(event_it->second == "key_press"){
-                                    combo_modifiers_pressed.push_back(keycode_int);
-                                    text_combo_modifier = (isTextModifier(keycode_int) && combo_modifiers_pressed.size() == 1);
+                                    if(combo_modifiers_pressed.size()==0 || (combo_modifiers_pressed.size() >0 && std::find(combo_modifiers_pressed.begin(),combo_modifiers_pressed.end(),keycode_int)==combo_modifiers_pressed.end())){
+                                        combo_modifiers_pressed.push_back(keycode_int);
+                                    }
+                                    text_combo_modifier = (combo_modifiers_pressed.size() == 1 && isTextModifier(keycode_int));
                                 }
                                 if(event_it->second == "key_release"){
-                                    combo_modifiers_pressed.pop_back();
-                                    text_combo_modifier = (isTextModifier(combo_modifiers_pressed.back()) && combo_modifiers_pressed.size() == 1);
+                                    if(combo_modifiers_pressed.size()>0)
+                                        combo_modifiers_pressed.pop_back();
+                                    text_combo_modifier = (combo_modifiers_pressed.size() == 1 && isTextModifier(combo_modifiers_pressed.back()));
                                 }
                             }
                             if(!keycode_modifier_string.empty() && isActionActive["getModifierKeysPressed"] && event_it->second == "key_press"){
@@ -3917,7 +3920,7 @@ std::vector<std::string> InspectorWidgetProcessor::parseHookEvents(std::string h
                             rawcode_time = ts_now;
                         }
                         bool combo_text_compatible = (combo_modifiers_pressed.size() == 0 || (combo_modifiers_pressed.size() == 1 && isTextModifier(combo_modifiers_pressed.back())));
-                        if(/*keycode_time == keychar_time &&*/ keychar_received && keychar_canformword && combo_text_compatible/*keycode_canformword*/){
+                        if(combo_text_compatible && ((keychar_received && keychar_canformword) || (keycode_int == VC_BACKSPACE))){
                             if(word.empty()){
                                 wordin = (ts_now - ts_start)*fps;
                             }
