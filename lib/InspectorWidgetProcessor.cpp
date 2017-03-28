@@ -4859,6 +4859,7 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
                             std::string _tab(" ");
                             pugi::xml_node _w = w.first_child();
                             pugi::xml_node _nfc;
+                            pugi::xml_node _scrl;
                             while( !_w.empty() ){
                                 bool matching_widget = false;
                                 pugi::xml_node c = _w;
@@ -4958,7 +4959,19 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
                                 //                            std::cout << " wl=" << _wl << " wr=" << _wr << " wt=" << _wt << " wb=" << _wb << " ";
                                 //                            std::cout << " x=" << x << " y=" << y;
 
-                                if( _wl < _x && _x < _wr && _wt < _y && _y < _wb){
+                                bool matches = false;
+                                if(std::string(_w.name()) == "AXScrollBar"){
+                                    std::string _wo = c.attribute("AXOrientation").as_string();
+                                    if(_wo == "AXVerticalOrientation"){
+                                        matches =  _wl < _x && _x < _wr;
+                                    }
+                                    else if(_wo == "AXHorizontalOrientation"){
+                                        matches =  _wt < _y && _y < _wb;
+                                    }
+                                    _scrl = pugi::xml_node();
+                                }
+
+                                if(matches || (_wl < _x && _x < _wr && _wt < _y && _y < _wb)){
                                     //std::cout << " MATCHES ";
                                     std::vector<float> _rect(4,0.0);
                                     _rect[0] = _wl;
@@ -4974,6 +4987,11 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
                                     _infos[area] = _info;
                                     //std::cout << " area=" << area;
                                     //std::cout << std::endl;
+
+                                    if(!_w.child("AXScrollBar").empty()){
+                                        std::cout << "Spotted AXScrollBar as child of " << _w.name() << std::endl;
+                                        _scrl = _w.child("AXScrollBar");
+                                    }
                                     _w = _w.first_child();
                                     _tab += " ";
                                     matching_widget = true;
@@ -4983,7 +5001,14 @@ InspectorWidgetAccessibilityHoverInfo InspectorWidgetProcessor::getAccessibility
                                 }
 
                                 if(_w.empty()){
-                                    _w = _nfc;
+                                    if(!_scrl.empty()){
+                                        _w = _scrl;
+                                        //_scrl = pugi::xml_node();
+                                    }
+                                    else{
+                                        _w = _nfc;
+                                    }
+
                                     _tab = " ";
                                 }
 
