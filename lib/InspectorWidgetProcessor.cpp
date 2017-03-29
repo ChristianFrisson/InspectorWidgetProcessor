@@ -4440,6 +4440,8 @@ std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotatio
                 bool elementAlreadyMatched = false;
                 bool elementMatched = false;
 
+                std::string label;
+
                 for (pugi::xml_node n: root.children())
                 {
                     _clock = n.attribute("clock").as_llong();
@@ -4488,8 +4490,12 @@ std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotatio
                                 elementAlreadyMatched = true;
                             }
                             elementMatched = true;
+                            std::string name = tpath.node().name();
+                            std::string title = tpath.node().attribute("AXTitle").as_string();
+                            std::string roleDesc = tpath.node().attribute("AXRoleDescription").as_string();
+                            std::string value = tpath.node().attribute("AXValue").as_string();
+                            label = *a+": "+name+" AXTitle=\""+title+"\" AXRoleDescription=\""+roleDesc+"\" AXValue=\""+value+"\"";
                             //std::cout << "-> matches" << std::endl;
-
                         }
 
                     }
@@ -4497,8 +4503,8 @@ std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotatio
                         elementAlreadyMatched = false;
                         double _start_t = double(_start_clock - this->start_clock )/1000000000.0;
                         double _end_t = double(_clock - this->start_clock )/1000000000.0;
-                        this->annotations[*a]->addElement( new AnnotationStringSegment(_start_t,_end_t,*a));
-                        segment(*w_s[*a], _start_t*this->fps,_end_t*this->fps,this->fps, *a );
+                        this->annotations[*a]->addElement( new AnnotationStringSegment(_start_t,_end_t,label));
+                        segment(*w_s[*a], _start_t*this->fps,_end_t*this->fps,this->fps, label );
                         //std::cout << "-> segment" << std::endl;
                     }
                 }
@@ -4506,8 +4512,8 @@ std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotatio
                     elementAlreadyMatched = false;
                     double _start_t = double(_start_clock - this->start_clock )/1000000000.0;
                     double _end_t = double(_clock - this->start_clock )/1000000000.0;
-                    this->annotations[*a]->addElement( new AnnotationStringSegment(_start_t,_end_t,*a));
-                    segment(*w_s[*a], _start_t*this->fps,_end_t*this->fps,this->fps, *a );
+                    this->annotations[*a]->addElement( new AnnotationStringSegment(_start_t,_end_t,label));
+                    segment(*w_s[*a], _start_t*this->fps,_end_t*this->fps,this->fps, label );
                     //std::cout << "-> segment" << std::endl;
                 }
             }
