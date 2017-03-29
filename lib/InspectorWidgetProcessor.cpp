@@ -4422,7 +4422,7 @@ std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotatio
                     if(name == "AXWindow"){
                         windowName = title;
                     }
-                    xPathQuery = "/" + name + "[@AXTitle=\""+title+"\"]" + "[@AXRoleDescription=\""+roleDesc+"\"]" + xPathQuery;
+                    xPathQuery = "/" + name + (!title.empty()?"[@AXTitle=\""+title+"\"]":"") + (!roleDesc.empty()?"[@AXRoleDescription=\""+roleDesc+"\"]":"") + xPathQuery;
 
                     //std::cout << indent << name << " -> title '" << title << "' roleDesc '" << roleDesc << "'" << std::endl;
 
