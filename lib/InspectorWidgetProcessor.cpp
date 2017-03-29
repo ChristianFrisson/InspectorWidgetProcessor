@@ -4616,8 +4616,24 @@ std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotatio
             if(_clock > this->start_clock && _clock < this->end_clock){
                 double _event_t = double(_clock - this->start_clock )/1000000000.0;
                 //std::cout << "application";
-                this->annotations[trackApplicationSnapshotAnnotation]->addElement( new AnnotationStringEvent(_event_t,trackApplicationSnapshotAnnotation));
-                event(*w_s[trackApplicationSnapshotAnnotation], _event_t*this->fps, this->fps, trackApplicationSnapshotAnnotation );
+                std::string appTitle,windowTitle,label;
+                label = trackApplicationSnapshotAnnotation;
+                pugi::xml_node a = n.child("AXApplication");
+                if(!a.empty()){
+                    appTitle = a.attribute("AXTitle").as_string();
+                    pugi::xml_node w = a.child("AXWindow");
+                    if(!appTitle.empty()){
+                        label += ": AXApplication=\""+appTitle+"\"";
+                        if(!w.empty()){
+                            windowTitle = w.attribute("AXTitle").as_string();
+                            if(!windowTitle.empty()){
+                                label += " AXWindow=\""+windowTitle+"\"";
+                            }
+                        }
+                    }
+                }
+                this->annotations[trackApplicationSnapshotAnnotation]->addElement( new AnnotationStringEvent(_event_t,label));
+                event(*w_s[trackApplicationSnapshotAnnotation], _event_t*this->fps, this->fps, label );
             }
         }
         eventfooter(*w_s[trackApplicationSnapshotAnnotation], trackApplicationSnapshotAnnotation,"accessibility",this->video_frames, this->fps);
