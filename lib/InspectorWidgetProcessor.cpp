@@ -533,7 +533,7 @@ InspectorWidgetProcessor::InspectorWidgetProcessor(){
     supported_accessibility_actions.push_back("getFocusApplication");
     supported_accessibility_actions.push_back("getFocusWindow");
     supported_accessibility_actions.push_back("getPointedWidget");
-    supported_accessibility_actions.push_back("getWorkspaceSnapshot");
+    supported_accessibility_actions.push_back("trackApplicationSnapshot");
 
     //supported_input_hook_tests.push_back("during");
     supported_input_hook_tests.push_back(""); // make test statements optional
@@ -4362,8 +4362,8 @@ std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotatio
     std::string getFocusWindowAnnotation("");
     bool getPointedWidget = false;
     std::string getPointedWidgetAnnotation("");
-    bool getWorkspaceSnapshot = false;
-    std::string getWorkspaceSnapshotAnnotation("");
+    bool trackApplicationSnapshot = false;
+    std::string trackApplicationSnapshotAnnotation("");
     bool matchAccessible = false;
     std::vector<std::string> accessiblesToMatch;
 
@@ -4389,9 +4389,9 @@ std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotatio
             getPointedWidget = true;
             getPointedWidgetAnnotation = *name;
         }
-        else if(ax_action[*name] == "getWorkspaceSnapshot"){
-            getWorkspaceSnapshot = true;
-            getWorkspaceSnapshotAnnotation = *name;
+        else if(ax_action[*name] == "trackApplicationSnapshot"){
+            trackApplicationSnapshot = true;
+            trackApplicationSnapshotAnnotation = *name;
         }
         else if(ax_action[*name] == "matchAccessible"){
             std::cout << "matchAccessible" << std::endl;
@@ -4604,11 +4604,11 @@ std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotatio
         eventfooter(*w_s[getPointedWidgetAnnotation], getPointedWidgetAnnotation,"accessibility",this->video_frames, this->fps);
         annotation_progress[getPointedWidgetAnnotation] = 1.0;
     }
-    if(getWorkspaceSnapshot){
+    if(trackApplicationSnapshot){
         for (pugi::xml_node n: root.children("application"))
         {
             uint64_t _clock = n.attribute("clock").as_llong();
-            annotation_progress[getWorkspaceSnapshotAnnotation] = double(_clock - this->start_clock ) / double(this->end_clock - this->start_clock );
+            annotation_progress[trackApplicationSnapshotAnnotation] = double(_clock - this->start_clock ) / double(this->end_clock - this->start_clock );
             //std::cout << "application " << n.attribute("name").as_string();
             if(_clock > this->end_clock){
                 break;
@@ -4616,12 +4616,12 @@ std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotatio
             if(_clock > this->start_clock && _clock < this->end_clock){
                 double _event_t = double(_clock - this->start_clock )/1000000000.0;
                 //std::cout << "application";
-                this->annotations[getWorkspaceSnapshotAnnotation]->addElement( new AnnotationStringEvent(_event_t,getWorkspaceSnapshotAnnotation));
-                event(*w_s[getWorkspaceSnapshotAnnotation], _event_t*this->fps, this->fps, getWorkspaceSnapshotAnnotation );
+                this->annotations[trackApplicationSnapshotAnnotation]->addElement( new AnnotationStringEvent(_event_t,trackApplicationSnapshotAnnotation));
+                event(*w_s[trackApplicationSnapshotAnnotation], _event_t*this->fps, this->fps, trackApplicationSnapshotAnnotation );
             }
         }
-        eventfooter(*w_s[getWorkspaceSnapshotAnnotation], getWorkspaceSnapshotAnnotation,"accessibility",this->video_frames, this->fps);
-        annotation_progress[getWorkspaceSnapshotAnnotation] = 1.0;
+        eventfooter(*w_s[trackApplicationSnapshotAnnotation], trackApplicationSnapshotAnnotation,"accessibility",this->video_frames, this->fps);
+        annotation_progress[trackApplicationSnapshotAnnotation] = 1.0;
     }
 
     for(std::vector<std::string>::iterator name = names.begin(); name != names.end();name++ ){
