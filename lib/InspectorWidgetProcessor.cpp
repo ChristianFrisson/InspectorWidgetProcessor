@@ -1657,7 +1657,7 @@ bool InspectorWidgetProcessor::init( std::vector<std::string> argv ){
             msg << "Error while parsing clock timestamps file " << tspath << " , aborting";
             return setStatusAndReturn(/*phase*/"init",/*error*/msg.str(), /*success*/"");
         }
-        this->end_clock = this->ts_clock[this->ts_clock.size()-1];
+        this->end_clock = this->ts_clock.rbegin()->second;
         //this->end_clock = this->start_clock + 1000000000*(float(this->video_frames)/float(this->fps));
         int ts_time_size = this->ts_time.size();
         int ts_clock_size = this->ts_clock.size();
