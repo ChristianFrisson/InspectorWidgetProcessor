@@ -4450,7 +4450,7 @@ std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotatio
                     //std::cout << name << std::endl;
                     if(name == "windowEvent"){
                         windowFocusKnown = false;
-                        std::string query = "./target[@app=\""+appName+"\"][@title=\""+windowName+"\"]";
+                        std::string query = "./target";//[@app=\""+appName+"\"][@title=\""+windowName+"\"]";
                         pugi::xpath_node tpath;
                         try{
                             tpath = n.select_single_node(query.c_str());
@@ -4461,7 +4461,10 @@ std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotatio
 
                         if (tpath)
                         {
-                            windowHasFocus = true;
+                            std::string app = tpath.node().attribute("name").as_string();
+                            std::string title = tpath.node().attribute("title").as_string();
+                            if((app == "Window Server" && title == "Cursor") || (app == appName && title == windowName))
+                                windowHasFocus = true;
                         }
                         if(!windowHasFocus) elementMatched = false;
                         //std::cout << "-> focus " << windowHasFocus << std::endl;
@@ -4469,7 +4472,7 @@ std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotatio
                     else if(name == "appchange"){
                         appFocusKnown = true;
                         std::string app = n.attribute("name").as_string();
-                        appHasFocus = (app == appName);
+                        appHasFocus = (app == "Window Server" || app == appName);
                         if(!appHasFocus) elementMatched = false;
                         //std::cout << "-> focus " << appHasFocus << std::endl;
                     }
@@ -4485,18 +4488,35 @@ std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotatio
 
                         if (tpath)
                         {
+                            pugi::xml_node w = tpath.node();
                             if(!elementAlreadyMatched){
                                 _start_clock = _clock;
                                 elementAlreadyMatched = true;
                             }
                             elementMatched = true;
-                            std::string name = tpath.node().name();
-                            std::string title = tpath.node().attribute("AXTitle").as_string();
-                            std::string roleDesc = tpath.node().attribute("AXRoleDescription").as_string();
-                            std::string value = tpath.node().attribute("AXValue").as_string();
+                            std::string name = w.name();
+                            std::string title = w.attribute("AXTitle").as_string();
+                            std::string roleDesc = w.attribute("AXRoleDescription").as_string();
+                            std::string value = w.attribute("AXValue").as_string();
                             label = *a+": "+name+" AXTitle=\""+title+"\" AXRoleDescription=\""+roleDesc+"\" AXValue=\""+value+"\"";
                             //std::cout << "-> matches" << std::endl;
                         }
+
+                        std::string appTitle,windowTitle,label;
+                        pugi::xml_node a = n.child("AXApplication");
+                        if(!a.empty()){
+                            appTitle = a.attribute("AXTitle").as_string();
+                            pugi::xml_node w = a.child("AXWindow");
+                            if(!appTitle.empty()){
+                                if(!w.empty()){
+                                    windowTitle = w.attribute("AXTitle").as_string();
+                                }
+                            }
+                        }
+                        if(elementAlreadyMatched && appTitle == "Window Server" && windowTitle == "Cursor"){
+                            elementMatched = true;
+                        }
+
 
                     }
                     if(elementAlreadyMatched && !elementMatched){
