@@ -4580,10 +4580,14 @@ std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotatio
                 //std::cout << "appchange " << n.attribute("name").as_string();
                 if(_clock > this->start_clock && _clock < this->end_clock && _last_clock != _clock){
                     _title = t.attribute("title").as_string();
+                    std::string _app = t.attribute("name").as_string();
                     double _event_t = double(_clock - this->start_clock )/1000000000.0;
                     //std::cout << "focus '" << t.attribute("title").as_string() << "':'" << t.attribute("app").as_string() << "' ";
-                    this->annotations[getFocusWindowAnnotation]->addElement( new AnnotationStringEvent(_event_t,_title));
-                    event(*w_s[getFocusWindowAnnotation], _event_t*this->fps, this->fps, _title );
+                    if(_app != "Window Server" && _title != "Cursor"){
+                        std::string label = getFocusWindowAnnotation + ": AXTitle=\""+_title+"\"";
+                        this->annotations[getFocusWindowAnnotation]->addElement( new AnnotationStringEvent(_event_t,label));
+                        event(*w_s[getFocusWindowAnnotation], _event_t*this->fps, this->fps, label );
+                    }
                 }
                 _last_clock = _clock;
             }
@@ -4592,9 +4596,9 @@ std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotatio
         annotation_progress[getFocusWindowAnnotation] = 1.0;
     }
     if(getPointedWidget){
-        std::string _name("");
         for (pugi::xml_node n: root.children("mouse"))
         {
+            std::string label = getPointedWidgetAnnotation+": ";
             uint64_t _clock = n.attribute("clock").as_llong();
             annotation_progress[getPointedWidgetAnnotation] = double(_clock - this->start_clock ) / double(this->end_clock - this->start_clock );
             //std::cout << "appchange " << n.attribute("name").as_string();
@@ -4611,14 +4615,18 @@ std::vector<std::string> InspectorWidgetProcessor::computeAccessibilityAnnotatio
                     {
                         pugi::xml_node t = tpath.node();
                         //std::cout << " -> " << t.name() << std::endl;
-                        _name = std::string(t.name()) + ": " + t.attribute("AXTitle").as_string();
+                        std::string name = std::string(t.name());
+                        std::string title = t.attribute("AXTitle").as_string();
+                        std::string roleDesc = t.attribute("AXRoleDescription").as_string();
+                        std::string value = t.attribute("AXValue").as_string();
+                        label += name+" AXTitle=\""+title+"\" AXRoleDescription=\""+roleDesc+"\" AXValue=\""+value+"\"";
                     }
                 }
                 catch(...){
                     std::cout << "Bad xpath" << std::endl;
                 }
-                this->annotations[getPointedWidgetAnnotation]->addElement( new AnnotationStringEvent(_event_t,_name));
-                event(*w_s[getPointedWidgetAnnotation], _event_t*this->fps, this->fps, _name );
+                this->annotations[getPointedWidgetAnnotation]->addElement( new AnnotationStringEvent(_event_t,label));
+                event(*w_s[getPointedWidgetAnnotation], _event_t*this->fps, this->fps, label );
             }
         }
         eventfooter(*w_s[getPointedWidgetAnnotation], getPointedWidgetAnnotation,"accessibility",this->video_frames, this->fps);
